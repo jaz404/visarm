@@ -1,0 +1,7 @@
+0: blue cube
+1: cubes
+2: cylinders
+3: green cube
+4: green cylinder
+5: red cube
+6: spheres
