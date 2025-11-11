@@ -1,0 +1,5 @@
+.vscode
+server/variables.py
+__pycache__/
+*.pyc
+.env
