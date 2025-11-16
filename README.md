@@ -9,7 +9,7 @@ Important Note: The servo.read() function does not provide feedback on the actua
 ## joint bounds
 
 | Motor | Joint Name        | Motion 1 (°) | Motion 2 (°) |
-|-------|-------------------|--------------|--------------|
+| ----- | ----------------- | ------------ | ------------ |
 | 1     | Base (ch 0)       | +90          | -80          |
 | 2     | Shoulder (ch 1)   | +30          | -80          |
 | 3     | Elbow (ch 2)      | +90          | -90          |
@@ -44,96 +44,22 @@ Since the robot has 6 revolute joints, we need to find 6 angles to move the robo
 
 The arm has to following D-H parameters:
 
-<table>
-    <tr>
-        <th>Link (i)</th>
-        <th>a<sub>i-1</sub></th>
-        <th>α<sub>i-1</sub></th>
-        <th>d<sub>i</sub></th>
-        <th>θ<sub>i</sub></th>
-    </tr>
-    <tr>
-        <td>1</td>
-        <td>0</td>
-        <td>90</td>
-        <td>a<sub>1</sub></td>
-        <td>θ<sub>1</sub></td>
-    </tr>
-    <tr>
-        <td>2</td>
-        <td>a<sub>2</sub></td>
-        <td>0</td>
-        <td>0</td>
-        <td>θ<sub>2</sub></td>
-    </tr>
-    <tr>
-        <td>3</td>
-        <td>a<sub>3</sub></td>
-        <td>0</td>
-        <td>0</td>
-        <td>θ<sub>3</sub></td>
-    </tr>
-        <tr>
-        <td>4</td>
-        <td>a<sub>4</sub></td>
-        <td>90</td>
-        <td>a<sub>5</sub></td>
-        <td>θ<sub>4</sub></td>
-    </tr>
-        <tr>
-        <td>5</td>
-        <td>a<sub>6</sub></td>
-        <td>0</td>
-        <td>0</td>
-        <td>θ<sub>5</sub></td>
-</table>
-</div>
-
-Note: For link 4, is the <th>α<sub>i-1</sub></th> correct?
+| Link (i) | θ<sub>i</sub> (°)  | α<sub>i-1 (°) | d<sub>i</sub> (in cm)         | a<sub>i-1</sub> (in cm) |
+| -------- | ------------------ | ------------- | ----------------------------- | ----------------------- |
+| 1        | θ<sub>1</sub>      | 90            | a<sub>1</sub>                 | 0                       |
+| 2        | θ<sub>2</sub>      | 0             | 0                             | a<sub>2</sub>           |
+| 3        | θ<sub>3</sub>      | 0             | 0                             | a<sub>3</sub>           |
+| 4        | θ<sub>4</sub> + 90 | 90            | 0                             | a<sub>5</sub>           |
+| 5        | θ<sub>5</sub>      | 0             | a<sub>4</sub> + a<sub>6</sub> | 0                       |
 
 Substituting values we get:
 
-<table>
-    <tr>
-        <th>Link (i)</th>
-        <th>a<sub>i-1</sub> (in cm)</th>
-        <th>α<sub>i-1</sub> (in °)</th>
-        <th>d<sub>i</sub> (in cm)</th>
-        <th>θ<sub>i</sub> (in °)</th>
-    </tr>
-    <tr>
-        <td>1</td>
-        <td>0</td>
-        <td>90</td>
-        <td>2</td>
-        <td>θ<sub>1</sub></td>
-    </tr>
-    <tr>
-        <td>2</td>
-        <td>10.3</td>
-        <td>0</td>
-        <td>0</td>
-        <td>θ<sub>2</sub></td>
-    </tr>
-    <tr>
-        <td>3</td>
-        <td>9.6</td>
-        <td>0</td>
-        <td>0</td>
-        <td>θ<sub>3</sub></td>
-    </tr>
-        <tr>
-        <td>4</td>
-        <td>4</td>
-        <td>90</td>
-        <td>2.5</td>
-        <td>θ<sub>4</sub></td>
-    </tr>
-        <tr>
-        <td>5</td>
-        <td>5</td>
-        <td>0</td>
-        <td>0</td>
-        <td>θ<sub>5</sub></td>
-</table>
-</div>
+| Link (i) | θ<sub>i</sub> (°)  | α<sub>i-1 (°) | d<sub>i</sub> (in cm) | a<sub>i-1</sub> (in cm) |
+| -------- | ------------------ | ------------- | --------------------- | ----------------------- |
+| 1        | θ<sub>1</sub>      | 90            | 2                     | 0                       |
+| 2        | θ<sub>2</sub>      | 0             | 0                     | 10.3                    |
+| 3        | θ<sub>3</sub>      | 0             | 0                     | 9.6                     |
+| 4        | θ<sub>4</sub> + 90 | 90            | 0                     | 2.5                     |
+| 5        | θ<sub>5</sub>      | 0             | 9                     | 0                       |
+
+## Forward kinematics:
