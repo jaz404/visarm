@@ -33,21 +33,21 @@ from kinematics import Kinematics
 
 class ArmVisualizer:
     def __init__(self):
-        """Initialize the arm visualizer with kinematics and matplotlib setup."""
-        # Initialize kinematics
+        """Initialize a simplified 2-DOF arm visualizer (first two joints only)."""
         ll = [2.0, 10.3, 9.6, 4.0, 2.5, 5.0]
         theta_symbols = sp.symbols('θ1 θ2 θ3 θ4 θ5')
         initial_offset = [0, 0, 9.5]
         dh_params = [
             {'a': 0, 'alpha': 90, 'd': ll[0], 'theta': theta_symbols[0]},
-            {'a': ll[1], 'alpha': 0, 'd': 0, 'theta': theta_symbols[1]},
-            {'a': ll[2], 'alpha': 0, 'd': 0, 'theta': theta_symbols[2]},
+            {'a': ll[1], 'alpha': 0, 'd': 0,
+                'theta': theta_symbols[1] + np.pi/2},
+            {'a': ll[2], 'alpha': 0, 'd': 0, 'theta': -theta_symbols[2]},
             {'a': ll[4], 'alpha': 90, 'd': 0,
-                'theta': theta_symbols[3] + sp.pi/2},
+                'theta': -theta_symbols[3] + np.pi/2},
             {'a': 0, 'alpha': 0, 'd': ll[3] +
                 ll[5], 'theta': theta_symbols[4]},
         ]
-        joint_limits = [(-90, 75), (-90, 90), (-90, 80), (-90, 90), (-90, 90)]
+        joint_limits = [(-80, 90), (-80, 80), (-90, 90), (-90, 90), (-90, 90)]
 
         self.kin = Kinematics(
             ll=ll,
@@ -57,7 +57,6 @@ class ArmVisualizer:
             initial_offset=initial_offset
         )
 
-        # Current joint angles (degrees)
         self.joint_angles = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
 
         # Target point
@@ -109,15 +108,14 @@ class ArmVisualizer:
         slider_width = 0.15
 
         self.sliders = []
-        for i in range(5):
-            ax_slider = plt.axes(
-                [slider_left, 0.75 - i*0.12, slider_width, slider_height])
+        for i in range(len(self.joint_angles)):
+            ax_slider = plt.axes([
+                slider_left, 0.75 - i*0.12, slider_width, slider_height
+            ])
             lo, hi = self.kin.joint_limits[i]
             slider = Slider(
-                ax_slider, f'J{i+1}',
-                lo, hi,
-                valinit=self.joint_angles[i],
-                valstep=1.0
+                ax_slider, f'J{i+1}', lo, hi,
+                valinit=self.joint_angles[i], valstep=1.0
             )
             slider.on_changed(
                 lambda val, idx=i: self.on_slider_change(idx, val))
@@ -142,22 +140,34 @@ class ArmVisualizer:
         )
 
     def compute_link_positions(self, joint_angles):
-        """Compute all link positions for visualization."""
+        """Compute link positions for the 2-joint configuration."""
         positions = []
-
-        # Get individual transforms
-        angle_subs = {self.kin.θ[i]: np.radians(
-            joint_angles[i]) for i in range(5)}
         transforms = self.kin.compute_dh_matrix(symbolic=True)
 
-        # Accumulate transforms
+        # Substitute only available joints
+        angle_subs = {self.kin.θ[i]: np.radians(joint_angles[i])
+                      for i in range(len(joint_angles))}
+
         T = sp.eye(4)
-        for i in range(6):  # base + 5 joints
+        # Base frame + number of joints defined
+        for i in range(len(transforms)):
             T = T @ transforms[i]
             T_num = np.array(T.subs(angle_subs)).astype(np.float64)
             positions.append(T_num[:3, 3])
 
         return np.array(positions)
+
+    def get_end_effector_rotation(self, joint_angles):
+        """Return the end-effector rotation matrix (3x3) for current angles."""
+        transforms = self.kin.compute_dh_matrix(symbolic=True)
+        angle_subs = {self.kin.θ[i]: np.radians(joint_angles[i])
+                      for i in range(len(joint_angles))}
+
+        T = sp.eye(4)
+        for Ti in transforms:
+            T = T @ Ti
+        T_num = np.array(T.subs(angle_subs)).astype(np.float64)
+        return T_num[:3, :3]
 
     def update_arm(self):
         """Update the arm visualization."""
@@ -187,10 +197,26 @@ class ArmVisualizer:
 
         # Highlight end-effector
         ee_pos = positions[-1]
-        self.ee_scatter = self.ax.scatter(
-            [ee_pos[0]], [ee_pos[1]], [ee_pos[2]],
-            c='red', s=200, marker='*', label='End-Effector'
-        )
+        # Draw claws as two fingers along local z-axis; lateral offset rotates with J5
+        finger_len = 3.0
+        half_width = 1.0
+
+        R_ee = self.get_end_effector_rotation(self.joint_angles)
+        x_ee = R_ee[:, 0]
+        z_ee = R_ee[:, 2]
+
+        p1_start = ee_pos + x_ee * half_width
+        p1_end = p1_start + z_ee * finger_len
+        p2_start = ee_pos - x_ee * half_width
+        p2_end = p2_start + z_ee * finger_len
+
+        xs = [p1_start[0], p1_end[0], np.nan, p2_start[0], p2_end[0]]
+        ys = [p1_start[1], p1_end[1], np.nan, p2_start[1], p2_end[1]]
+        zs = [p1_start[2], p1_end[2], np.nan, p2_start[2], p2_end[2]]
+
+        # Single Line3D artist containing both claw segments (NaN separates segments)
+        self.ee_scatter = self.ax.plot(
+            xs, ys, zs, color='red', linewidth=3)[0]
 
         # Draw target if set
         if self.target_point is not None:
@@ -264,40 +290,11 @@ class ArmVisualizer:
                 print(f"Target set to: [{x:.2f}, {y:.2f}, {z:.2f}]")
 
                 # Try to move arm to target
-                self.move_to_target()
+                # self.move_to_target()
 
     def move_to_target(self):
-        """Move the arm to the target point using IK."""
-        if self.target_point is None:
-            return
-
-        # Create a target transformation matrix
-        # For simplicity, we'll keep the default orientation
-        # (pointing along +z axis in the end-effector frame)
-        T_target = np.eye(4)
-        T_target[:3, 3] = self.target_point
-
-        # Default orientation: z-axis pointing up, x-axis pointing forward
-        # This is a reasonable default for pick-and-place tasks
-        T_target[:3, :3] = np.array([
-            [0, 0, 1],
-            [0, -1, 0],
-            [1, 0, 0]
-        ])
-
-        try:
-            # Compute IK
-            joint_angles_ik = self.kin.inverse_kinematics_analytic(T_target)
-
-            # Animate transition (optional - just jump for now)
-            self.joint_angles = joint_angles_ik
-            self.update_arm()
-
-            print(f"IK solution: {joint_angles_ik}")
-
-        except Exception as e:
-            print(f"IK failed: {e}")
-            print("Target may be unreachable")
+        """(Disabled) IK movement not supported in 2-joint mode."""
+        print("IK move disabled for 2-joint visualization.")
 
     def on_key(self, event):
         """Handle keyboard events."""
@@ -319,14 +316,14 @@ class ArmVisualizer:
                 self.move_to_target()
 
     def reset_to_home(self, event=None):
-        """Reset arm to home position."""
-        self.joint_angles = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
+        """Reset arm to home position (2 joints)."""
+        self.joint_angles = np.array([0.0, 0.0])
         self.target_point = None
         if self.target_scatter:
             self.target_scatter.remove()
             self.target_scatter = None
         self.update_arm()
-        print("Reset to home position")
+        print("Reset to home position (2-joint mode)")
 
     def toggle_workspace(self, event=None):
         """Toggle workspace boundary visualization."""

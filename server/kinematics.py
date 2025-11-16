@@ -200,20 +200,15 @@ def main():
     initial_offset = [0, 0, 9.5]
     dh_params = [
         {'a': 0, 'alpha': 90, 'd': ll[0], 'theta': theta_symbols[0]},
-        {'a': ll[1], 'alpha': 0, 'd': 0, 'theta': theta_symbols[1]},
-        {'a': ll[2], 'alpha': 0, 'd': 0, 'theta': theta_symbols[2]},
+        {'a': ll[1], 'alpha': 0, 'd': 0,
+            'theta': theta_symbols[1] + np.pi/2},
+        {'a': ll[2], 'alpha': 0, 'd': 0, 'theta': -theta_symbols[2]},
         {'a': ll[4], 'alpha': 90, 'd': 0,
-            'theta': theta_symbols[3] + sp.pi/2},  # +90° in radians
-        {'a': 0, 'alpha': 0, 'd': ll[3] + ll[5], 'theta': theta_symbols[4]},
+            'theta': -theta_symbols[3] + np.pi/2},
+        {'a': 0, 'alpha': 0, 'd': ll[3] +
+            ll[5], 'theta': theta_symbols[4]},
     ]
-    joint_limits = [
-        (-90, 75),      # Base Rotation (Sweep) - Joint 1
-        (-90, 90),      # Shoulder - Joint 2
-        (-90, 80),      # Elbow - Joint 3
-        (-90, 90),      # Wrist Pitch - Joint 4
-        (-90, 90),      # Wrist Roll - Joint 5
-        # (65, 90)        # Gripper - Joint 6
-    ]
+    joint_limits = [(-80, 90), (-80, 80), (-90, 90), (-90, 90), (-90, 90)]
 
     kin = Kinematics(
         ll=ll,
@@ -235,15 +230,15 @@ def main():
     # sp.pprint(t)
 
     # round_trip_test(kin, n=100)
-    angles = [20, 20, 20, 40, 20]
+    angles = [0,0,0,0,0]
     end_eff_pos = kin.forward_kinematics(angles)
     print(f"End Effector Position for joints {angles}:")
     print(end_eff_pos)
 
-    joints=kin.inverse_kinematics_analytic(end_eff_pos)
-    print("Inverse Kinematics Result for the above position:")
-    for i in range(len(joints)):
-        print(f"Joint {i+1}: {joints[i]:.2f} - {angles[i]} = {joints[i]-angles[i]:.2f} degrees")
+    # joints=kin.inverse_kinematics_analytic(end_eff_pos)
+    # print("Inverse Kinematics Result for the above position:")
+    # for i in range(len(joints)):
+    #     print(f"Joint {i+1}: {joints[i]:.2f} - {angles[i]} = {joints[i]-angles[i]:.2f} degrees")
 
 
 if __name__ == "__main__":
