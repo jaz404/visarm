@@ -8,14 +8,14 @@ Important Note: The servo.read() function does not provide feedback on the actua
 
 ## joint bounds
 
-| Motor | Joint Name  | Motion 1 (°) | Motion 2 (°) | Speed | Delay After (ms) | Notes |
-|--------|--------------|--------------|--------------|--------|------------------|-------|
-| 1 | Base (ch 0) | -90 | +75 | 5 | 1000 | Base rotation sweep |
-| 2 | Shoulder (ch 1) | -90 | +90 | 5 | 1000 | Shoulder up/down |
-| 3 | Elbow (ch 2) | -90 | +80 | 5 | 1000 | Elbow bend |
-| 4 | Wrist Roll (ch 3) | -90 | +90 | 5 | 1000 | Wrist forward/backward |
-| 5 | Wrist Yaw (ch 4) | -90 | +90 | 5 | 1000 | Wrist rotation |
-| 6 | Gripper (ch 5) | +65 (open) | +90 (close) | 3 | 2000 | Claw open/close |
+| Motor | Joint Name        | Motion 1 (°) | Motion 2 (°) |
+|-------|-------------------|--------------|--------------|
+| 1     | Base (ch 0)       | +90          | -80          |
+| 2     | Shoulder (ch 1)   | +30          | -80          |
+| 3     | Elbow (ch 2)      | +90          | -90          |
+| 4     | Wrist Roll (ch 3) | +90          | -90          |
+| 5     | Wrist Yaw (ch 4)  | +90          | -90          |
+| 6     | Gripper (ch 5)    | +65 (open)   | +90 (close)  |
 
 ## Inverse Kinematics:
 
