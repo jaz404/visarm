@@ -28,7 +28,7 @@ from matplotlib.widgets import Button, Slider
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Line3D
 import sympy as sp
-from kinematics import Kinematics
+from server.kinematics.visualServoing import VisualServoing
 
 
 class ArmVisualizer:
@@ -49,7 +49,7 @@ class ArmVisualizer:
         ]
         joint_limits = [(-80, 90), (-80, 80), (-90, 90), (-90, 90), (-90, 90)]
 
-        self.kin = Kinematics(
+        self.kin = VisualServoing(
             ll=ll,
             dh_params=dh_params,
             joint_limits=joint_limits,

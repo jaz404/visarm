@@ -1,11 +1,8 @@
 import numpy as np
 import sympy as sp
 
-# Generalized Kinematics class for a robotic arm
-# Uses Denavit-Hartenberg parameters for transformations
 
-
-class Kinematics:
+class VisualServoing:
     # (✔)
     def __init__(self,
                  ll: list = None,
@@ -13,7 +10,6 @@ class Kinematics:
                  joint_limits: list = None,
                  variables: sp.symbols = None,
                  initial_offset: list = None):
-        # Initialize kinematics parameters here
         self.ll = ll
         self.θ = variables
         self.initial_offset = initial_offset
@@ -21,6 +17,7 @@ class Kinematics:
         self.joint_limits = joint_limits
         self.speed = 5.0  # Default speed in units/sec
         self.J = None  # Cache for Jacobian matrix
+        self.L = None
 
     # (✔)
     def homogeneous_transform(self, params, symbolic=True):
@@ -112,92 +109,63 @@ class Kinematics:
         joints = joints.astype(np.float64)
         return joints
 
-    def inverse_kinematics_analytic(self, target_pos: np.ndarray) -> np.ndarray:
-        """
-        Analytical IK for 5-DOF arm using geometric decoupling.
-        Strategy:
-        1. Compute wrist center (origin of joint 4) by backing out from end-effector
-        2. Solve for joints 1-3 using geometric approach (position problem)
-        3. Solve for joints 4-5 using orientation (R0_3^T * R_target)
-        """
-        pos = target_pos[:3, 3]
-        rot = target_pos[:3, :3]
+    # (✔)
+    def jacobian_sym(self):
+        if self.J is not None:
+            return self.J
+
         n = len(self.θ)
-        joints = np.zeros(n)
-
-        d5 = self.ll[3] + self.ll[5]  # 9.0 cm
-        a4 = self.ll[4]  # 2.5 cm
-        wrist_center = pos - d5 * rot[:, 2] - a4 * rot[:, 0]
-        # Joint 1 rotates about z0, so we look at x-y projection
-        joints[0] = np.arctan2(wrist_center[1], wrist_center[0])
-
-        r = np.sqrt(wrist_center[0]**2 + wrist_center[1]**2)
-
-        base_height = self.ll[0] + self.initial_offset[2]
-        s = wrist_center[2] - base_height
-        L1 = self.ll[1]  # shoulder to elbow (a2)
-        L2 = self.ll[2]  # elbow to wrist (a3)
-
-        D_squared = r**2 + s**2
-        D = np.sqrt(D_squared)
-
-        # Check reachability
-        if D > (L1 + L2) or D < abs(L1 - L2):
-            D = np.clip(D, abs(L1 - L2) + 0.01, L1 + L2 - 0.01)
-            D_squared = D**2
-
-        cos_q3 = (D_squared - L1**2 - L2**2) / (2 * L1 * L2)
-        cos_q3 = np.clip(cos_q3, -1.0, 1.0)
-        joints[2] = np.arccos(cos_q3)  # Elbow up configuration
-
-        alpha = np.arctan2(s, r)  # Angle from horizontal to wrist
-        beta = np.arctan2(L2 * np.sin(joints[2]), L1 + L2 * np.cos(joints[2]))
-        joints[1] = alpha - beta
-
         transforms = self.compute_dh_matrix(symbolic=True)
-        angle_subs = {self.θ[i]: joints[i] for i in range(3)}
-        T0_3 = sp.eye(4)
-        for i in range(4):  # 0 (base offset) + joints 1,2,3
-            T0_3 = T0_3 @ transforms[i]
-        T0_3 = np.array(T0_3.subs(angle_subs)).astype(np.float64)
-        R0_3 = T0_3[:3, :3]
-        R3_5 = R0_3.T @ rot
-        joints[3] = np.arctan2(R3_5[0, 2], -R3_5[1, 2]) - np.pi/2
-        joints[4] = np.arctan2(R3_5[2, 0], R3_5[2, 1])
 
-        # Convert to degrees and apply joint limits
-        joints = np.degrees(joints)
-        return self.calculate_joint_limits(joints)
+        # Position of the end effector
+        T_end = sp.eye(4)
+        for i in range(n + 1):
+            T_end = T_end @ transforms[i]
+        P_end = T_end[:3, 3]
 
+        J = sp.Matrix.zeros(6, n)
 
-def round_trip_test(kin, n=100):
-    ok = True
-    for _ in range(n):
-        print(f"Test {_+1}/{n}")
-        # random within joint limits (radians)
-        q_rand = []
-        for (lo, hi) in kin.joint_limits:
-            q_rand.append(np.radians(np.random.uniform(lo, hi)))
-        q_rand = np.array(q_rand)
-        # if your forward expects degrees adjust
-        T = kin.forward_kinematics(np.degrees(q_rand))
-        q_ik = kin.inverse_kinematics_analytic(T)
-        T2 = kin.forward_kinematics(q_ik)
-        pos_err = np.linalg.norm(T[:3, 3] - T2[:3, 3])
-        # orientation error via rotation matrices
-        R_err = T[:3, :3] @ T2[:3, :3].T
-        angle_err = np.arccos(np.clip((np.trace(R_err)-1)/2, -1, 1))
-        if pos_err > 15 or np.degrees(angle_err) > 15:
-            print("Failed sample:", pos_err, np.degrees(angle_err))
-            ok = False
-            break
-    print("Round-trip tests passed?", ok)
+        Z = sp.Matrix([0, 0, 1])  # Initial Z axis
+        O = sp.Matrix([0, 0, 0])  # Initial origin
+
+        for i in range(n):
+            T_i = sp.eye(4)
+            for j in range(i + 1):
+                T_i = T_i @ transforms[j]
+            R_i = T_i[:3, :3]
+            O_i = T_i[:3, 3]
+            Z_i = R_i * Z
+
+            Jv = Z_i.cross(P_end - O_i)
+            Jw = Z_i
+
+            J[:3, i] = Jv
+            J[3:, i] = Jw
+
+        self.J = J
+        return J
+
+    # (✔)
+    def jacobian_numeric(self, joint_angles):
+        J_sym = self.jacobian_sym()
+        angle_subs = {self.θ[i]: np.radians(
+            joint_angles[i]) for i in range(len(joint_angles))}
+        J_num = J_sym.subs(angle_subs)
+        J_num = np.array(J_num).astype(np.float64)
+        return J_num
+
+    def set_calibration(self, L):
+
+        self.L = L
+
+    # def inverse_kinematics_broyden(self, features):
+        
 
 
 def main():
     ll = [2.0, 10.3, 9.6, 4.0, 2.5, 5.0]
     theta_symbols = sp.symbols('θ1 θ2 θ3 θ4 θ5')
-    initial_offset = [0, 0, 9.5]
+    initial_offset = [0, 0, 0]
     dh_params = [
         {'a': 0, 'alpha': 90, 'd': ll[0], 'theta': theta_symbols[0]},
         {'a': ll[1], 'alpha': 0, 'd': 0,
@@ -210,7 +178,7 @@ def main():
     ]
     joint_limits = [(-80, 90), (-80, 80), (-90, 90), (-90, 90), (-90, 90)]
 
-    kin = Kinematics(
+    kin = VisualServoing(
         ll=ll,
         dh_params=dh_params,
         joint_limits=joint_limits,
@@ -224,21 +192,19 @@ def main():
     for i, mat in enumerate(transforms):
         t = t @ mat            # use mat, not the loop variable named t
         t = sp.simplify(t)     # assign the simplified result
-        # print(f"Transform {i}:")
+        print(f"Transform {i}:")
         # sp.pprint(t)
 
     # sp.pprint(t)
 
-    # round_trip_test(kin, n=100)
-    angles = [0,0,0,0,0]
-    end_eff_pos = kin.forward_kinematics(angles)
-    print(f"End Effector Position for joints {angles}:")
-    print(end_eff_pos)
+    # angles = [0, 0, 0, 0, 0]
+    # end_eff_pos = kin.forward_kinematics(angles)
+    # print(f"End Effector Position for joints {angles}:")
+    # print(end_eff_pos)
 
-    # joints=kin.inverse_kinematics_analytic(end_eff_pos)
-    # print("Inverse Kinematics Result for the above position:")
-    # for i in range(len(joints)):
-    #     print(f"Joint {i+1}: {joints[i]:.2f} - {angles[i]} = {joints[i]-angles[i]:.2f} degrees")
+    print("Jacobian Matrix at zero angles:")
+    J_num = kin.jacobian_sym()
+    sp.pprint(J_num)
 
 
 if __name__ == "__main__":
