@@ -57,18 +57,17 @@ void CenterAllServos(){
 
 }
 void setJointAngles(float angles[]) {
-for (uint8_t i = 0; i < 6; i++) {
-    moveServo(i, angles[i]);
-}
-
+  for (uint8_t i = 0; i < 6; i++) {
+      moveServo(i, angles[i]);
+  }
 }
 
 void sendCurrentAngles() {
   Serial.print("ANGLES ");
-for (uint8_t i = 0; i < 6; i++) {
+  for (uint8_t i = 0; i < 6; i++) {
     Serial.print(currentAngles[i], 1);
-    if (i < 5) Serial.print(" ");
-}
+    if (i < 5) Serial.print(" "); 
+  }
 Serial.println();
 
 }
@@ -126,7 +125,7 @@ void loop() {
       if (count == 6) {
         for (int i = 0; i < 6; i++) newAngles[i] = (float)ai[i];
         setJointAngles(newAngles);
-        Serial.println("OK");
+        Serial.println("READY");
       } else {
         Serial.println("ERR BAD_FORMAT");
       }

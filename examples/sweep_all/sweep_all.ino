@@ -32,6 +32,12 @@ void moveServo(uint8_t ch, int targetAngle, int speed = 5) {
   currentAngle[ch] = targetAngle;
 }
 
+void CenterAllServos(){
+  for (int i = 0; i < 7;i++){
+      moveServo(i,0,5);
+      delay(5);
+  }
+}
 
 void setup() {
   Serial.begin(115200);
@@ -41,71 +47,71 @@ void setup() {
   pwmController.init();
   pwmController.setPWMFreqServo();
 
-
+  CenterAllServos();
 // CENTERING ALL JOINTS
 
   // motor 1
-  moveServo(0,0,5);
-  delay(1000);
+  // moveServo(0,0,5);
+  // delay(5);
 
-  // motor 2
-  moveServo(1,0,5);
-      delay(1000);
+  // // motor 2
+  // moveServo(1,0,5);
+  //     delay(5);
 
-  // motor 3
-  moveServo(2,0,5);
-  delay(1000);
+  // // motor 3
+  // moveServo(2,0,5);
+  // delay(1000);
 
-  // motor 4
-  moveServo(3,0,5);
-  delay(1000);
+  // // motor 4
+  // moveServo(3,0,5);
+  // delay(5);
 
-  // motor 5
-  moveServo(4,0,5);
-  delay(1000);
+  // // motor 5
+  // moveServo(4,0,5);
+  // delay(5);
 
   // motor 6
   // open claw
-  moveServo(5,65,3);
-  delay(1000);
+//  moveServo(5,65,3);
+//  delay(1000);
   // close claw   
-  moveServo(5,90,3);
-  delay(2000);  
+//  moveServo(5,90,3);
+//  delay(2000);  
 
 // CENTERING DONE
 
 // FULL SWEEP
 
   // m1
-  moveServo(0,90,5);
-  moveServo(0,-80,5);
-  moveServo(0,0,5);
-  delay(500); 
-
-  // m2
-  moveServo(1,30,5);
-  moveServo(1,-80,5);
-  moveServo(1,0,5);
-  delay(500); 
-
-  // m3
-  moveServo(2,90,5);
-  moveServo(2,-90,5);
-  moveServo(2,0,5);
-  delay(500); 
-
-  // m4
-  moveServo(3,90,5);
-  moveServo(3,-90,5);
-  moveServo(3,0,5);
-  delay(500); 
-
-  
-  // m5
-  moveServo(4,90,5);
-  moveServo(4,-90,5);
-  moveServo(4,0,5);
-  delay(500); 
+//  moveServo(0,90,5);
+//  moveServo(0,-80,5);
+//  moveServo(0,0,5);
+//  delay(500); 
+//
+//  // m2
+//  moveServo(1,30,5);
+//  moveServo(1,-80,5);
+//  moveServo(1,0,5);
+//  delay(500); 
+//
+//  // m3
+//  moveServo(2,90,5);
+//  moveServo(2,-90,5);
+//  moveServo(2,0,5);
+//  delay(500); 
+//
+//  // m4
+//  moveServo(3,90,5);
+//  moveServo(3,-90,5);
+//  moveServo(3,0,5);
+//  delay(500); 
+//
+//
+//  // m5
+//  moveServo(4,90,5);
+//  moveServo(4,-90,5);
+//  moveServo(4,0,5);
+//  delay(500); 
     
 }
 
