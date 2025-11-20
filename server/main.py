@@ -1,5 +1,5 @@
 from server_ import SerialHandler, LOG
-from kinematics import Kinematics
+from server.kinematics.visualServoing import Kinematics
 from visual import ObjectDetector, Camera
 import sys
 
