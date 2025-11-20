@@ -294,7 +294,38 @@ vpPoseVector VisArm::getPoseVector() {
   }
 
 // -------------------------------------------------------------------------
-// 7. Disconnect from robot
+// 7. Set joint angles on the robot
+// -------------------------------------------------------------------------
+bool VisArm::setJointAngles(const std::vector<double> &angles) {
+    if (angles.size() < 6) {
+      std::cerr << "[VisArm] setJointAngles requires 6 angles" << std::endl;
+      return false;
+    }
+    
+    std::ostringstream oss;
+    oss << "SET ";
+    for (size_t i = 0; i < 6; i++) {
+      oss << angles[i] << " ";
+    }
+    
+    std::string response = sendCommand(oss.str());
+    if (response.find("OK") != std::string::npos) {
+      std::cout << "[VisArm] Joint angles set successfully" << std::endl;
+      return true;
+    } else {
+      std::cerr << "[VisArm] Failed to set joint angles" << std::endl;
+      std::cout << "[VisArm] Response: " << response << std::endl;
+      return false;
+    }
+  }
+
+bool VisArm::setHome(){
+    std::vector<double> home_angles = {0, 0, 0, 0, 0, 0};
+    return setJointAngles(home_angles);
+  }
+
+// -------------------------------------------------------------------------
+// 8. Disconnect from robot
 // -------------------------------------------------------------------------
 void VisArm::disconnect() {
     if (serial_fd >= 0) {

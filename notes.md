@@ -73,23 +73,25 @@ Note:
 
 The arm has to following D-H parameters:
 
-| Link (i) | θ<sub>i</sub> (°)  | α<sub>i-1 (°) | d<sub>i</sub> (in cm)         | a<sub>i-1</sub> (in cm) |
-| -------- | ------------------ | ------------- | ----------------------------- | ----------------------- |
-| 1        | θ<sub>1</sub>      | 90            | a<sub>1</sub>                 | 0                       |
-| 2        | θ<sub>2</sub>      | 0             | 0                             | a<sub>2</sub>           |
-| 3        | θ<sub>3</sub>      | 0             | 0                             | a<sub>3</sub>           |
-| 4        | θ<sub>4</sub> + 90 | 90            | 0                             | a<sub>5</sub>           |
-| 5        | θ<sub>5</sub>      | 0             | a<sub>4</sub> + a<sub>6</sub> | 0                       |
+| Link (i) | θ<sub>i</sub> (°)     | α<sub>i-1 (°) | d<sub>i</sub> (in cm)         | a<sub>i-1</sub> (in cm) |
+| -------- | --------------------- | ------------- | ----------------------------- | ----------------------- |
+| 1        | θ<sub>1</sub>         | 90            | a<sub>1</sub>                 | 0                       |
+| 2        | θ<sub>2</sub> + pi/2  | 0             | 0                             | a<sub>2</sub>           |
+| 3        | -θ<sub>3</sub>        | 0             | 0                             | a<sub>3</sub>           |
+| 4        | -θ<sub>4</sub> + pi/2 | 90            | 0                             | a<sub>5</sub>           |
+| 5        | θ<sub>5</sub>         | 0             | a<sub>4</sub> + a<sub>6</sub> | 0                       |
+
+(For joints 2, 3, and 4 if you want to change the direction in the global x axis, negate theta.)
 
 Substituting values we get:
 
-| Link (i) | θ<sub>i</sub> (°)  | α<sub>i-1 (°) | d<sub>i</sub> (in cm) | a<sub>i-1</sub> (in cm) |
-| -------- | ------------------ | ------------- | --------------------- | ----------------------- |
-| 1        | θ<sub>1</sub>      | 90            | 2                     | 0                       |
-| 2        | θ<sub>2</sub>      | 0             | 0                     | 10.3                    |
-| 3        | θ<sub>3</sub>      | 0             | 0                     | 9.6                     |
-| 4        | θ<sub>4</sub> + 90 | 90            | 0                     | 2.5                     |
-| 5        | θ<sub>5</sub>      | 0             | 9                     | 0                       |
+| Link (i) | θ<sub>i</sub> (°)     | α<sub>i-1 (°) | d<sub>i</sub> (in cm) | a<sub>i-1</sub> (in cm) |
+| -------- | --------------------- | ------------- | --------------------- | ----------------------- |
+| 1        | θ<sub>1</sub>         | 90            | 2                     | 0                       |
+| 2        | θ<sub>2</sub> + pi/2  | 0             | 0                     | 10.3                    |
+| 3        | -θ<sub>3</sub>        | 0             | 0                     | 9.6                     |
+| 4        | -θ<sub>4</sub> + pi/2 | 90            | 0                     | 2.5                     |
+| 5        | θ<sub>5</sub>         | 0             | 9                     | 0                       |
 
 ## Forward kinematics:
 
@@ -113,7 +115,9 @@ Given the position and orientaion to point to, find the joint angles so that the
 Since the robot has 5 revolute joints, we need to find 5 angles to move the robot. This involves transformations from the end-effector to the base of the robot.
 
 #### Velocities
+
 The Jacobian is used to transform the joint velocities into end-effector velocities as follows:
+
 $$
 \begin{bmatrix}
 ẋ \cr
@@ -133,6 +137,7 @@ q̇_n\cr
 $$
 
 Therefore, in our case it would be:
+
 $$
 \begin{bmatrix}
 ẋ \cr
@@ -152,9 +157,11 @@ J_{6x5}\begin{bmatrix}
 $$
 
 #### Jacobian
+
 The jacobian would be a mxn matrix where m represents the dimensions (2D or 3D) and n represents the number of joints. In our case it would be 6x5 matrix as we are in 3D (so 3 for position and 3 for orientation) and 5 joints that determine the arms position / orientation.
 
 The jacobian can be divided into two parts, the first three for linear velocities and the bottom three for angular velocities:
+
 $$
 \begin{bmatrix}
 J_v  \cr
@@ -163,19 +170,20 @@ J_ω \cr
 $$
 
 #### Analytical Method
+
 We will try to extract a mathematical formula for the arm so that it is easy to compute. Our robot satifies the Pieper's law as the 2nd, 3rd and 4th joints are parallel and so we can find an analytical solution.
 
 - Assumption 1: The wrist position (Joint 4) depends on the first three joints. (0 to 3)
 - Assumption 2: The wrist orientation depends on the last two (that is joint 4 and joint 5). (The homogenous transformation from 5 to 3).
 
 ## References
+
 - https://www.youtube.com/watch?v=wDus2EKLg3s
 - https://automaticaddison.com/the-ultimate-guide-to-jacobian-matrices-for-robotics/
 - https://automaticaddison.com/homogeneous-transformation-matrices-using-denavit-hartenberg/#Example_3_%E2%80%93_Six_Degree_of_Freedom_Robotic_Arm
 - https://automaticaddison.com/the-ultimate-guide-to-inverse-kinematics-for-6dof-robot-arms/#Analytical_Approach_vs_Numerical_Approach_to_Inverse_Kinematics
 
 ## Things to look into
+
 - https://moveit.github.io/moveit_tutorials/doc/hand_eye_calibration/hand_eye_calibration_tutorial.html
 - https://openrave.org/docs/0.8.0/openravepy/ikfast/
-
-

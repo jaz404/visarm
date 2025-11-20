@@ -34,6 +34,8 @@ public:
   vpHomogeneousMatrix get_eMc();
   vpHomogeneousMatrix getBaseToCamera();
   vpPoseVector getPoseVector();
+  bool setJointAngles(const std::vector<double> &angles);
+  bool setHome();
   void disconnect();
 };
 
