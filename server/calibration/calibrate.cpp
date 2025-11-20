@@ -127,38 +127,78 @@ int main(int argc, const char **argv)
     unsigned cpt = 0;
     bool end = false;
 
+    // Poses to go to
+    std::vector<std::vector<double>> poses = {
+        {0, 0, 0, 0, 0, 0},
+        {30, 0, 0, 0, 0, 0},
+        {0, 30, 0, 0, 0, 0},
+        {0, 0, 30, 0, 0, 0},
+        {0, 0, 0, 30, 0, 0},
+        {0, 0, 0, 0, 30, 0},
+        {0, 0, 0, 0, 0, 30},
+        {45, 30, -30, 15, -15, 10}
+    };
+
     // -----------------------------------------------------------------------
     // MAIN LOOP
     // -----------------------------------------------------------------------
-    while (!end) {
+    // while (!end) {
+    //   g.acquire(I);
+    //   vpDisplay::display(I);
+
+    //   vpDisplay::displayText(I, 15, 15,
+    //                          "Left-click = save image + pose\n"
+    //                          "Right-click = quit",
+    //                          vpColor::red);
+
+    //   vpMouseButton::vpMouseButtonType button;
+    //   if (vpDisplay::getClick(I, button, false)) {
+    //     if (button == vpMouseButton::button1) {
+    //       cpt++;
+
+    //       vpPoseVector pose = robot.getPoseVector();
+
+    //       std::stringstream img_name, pose_name;
+    //       img_name << opt_output_folder << "/image_" << cpt << ".png";
+    //       pose_name << opt_output_folder << "/pose_" << cpt << ".yaml";
+
+    //       std::cout << "Saving " << img_name.str()
+    //                 << " + " << pose_name.str() << "\n";
+
+    //       vpImageIo::write(I, img_name.str());
+    //       pose.saveYAML(pose_name.str(), pose);
+    //     }
+    //     if (button == vpMouseButton::button3)
+    //       end = true;
+    //   }
+    //   vpDisplay::flush(I);
+    // }
+    for (size_t i = 0; i < poses.size(); i++) {
+      std::cout << "Moving to pose " << i + 1 << " / " << poses.size() << "\n";
+      if (!robot.setJointAngles(poses[i])) {
+        std::cerr << "Failed to move to pose\n";
+        continue;
+      }
+
+      // Wait a bit for the robot to reach the position
+      vpTime::wait(2000);
+
+      // Acquire image
       g.acquire(I);
       vpDisplay::display(I);
 
-      vpDisplay::displayText(I, 15, 15,
-                             "Left-click = save image + pose\n"
-                             "Right-click = quit",
-                             vpColor::red);
+      vpPoseVector pose = robot.getPoseVector();
 
-      vpMouseButton::vpMouseButtonType button;
-      if (vpDisplay::getClick(I, button, false)) {
-        if (button == vpMouseButton::button1) {
-          cpt++;
+      std::stringstream img_name, pose_name;
+      img_name << opt_output_folder << "/image_" << i + 1 << ".png";
+      pose_name << opt_output_folder << "/pose_" << i + 1 << ".yaml";
 
-          vpPoseVector pose = robot.getPoseVector();
+      std::cout << "Saving " << img_name.str()
+                << " + " << pose_name.str() << "\n";
 
-          std::stringstream img_name, pose_name;
-          img_name << opt_output_folder << "/image_" << cpt << ".png";
-          pose_name << opt_output_folder << "/pose_" << cpt << ".yaml";
+      vpImageIo::write(I, img_name.str());
+      pose.saveYAML(pose_name.str(), pose);
 
-          std::cout << "Saving " << img_name.str()
-                    << " + " << pose_name.str() << "\n";
-
-          vpImageIo::write(I, img_name.str());
-          pose.saveYAML(pose_name.str(), pose);
-        }
-        if (button == vpMouseButton::button3)
-          end = true;
-      }
       vpDisplay::flush(I);
     }
 
