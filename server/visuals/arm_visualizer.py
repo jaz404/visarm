@@ -31,6 +31,7 @@ from visualServoing import VisualServoing
 import serial
 import time
 
+# will need to change if port changes
 ser = serial.Serial(
     '/dev/ttyACM1',  
     baudrate=115200,
@@ -227,7 +228,6 @@ class ArmVisualizer:
         # Single Line3D artist containing both claw segments (NaN separates segments)
         self.ee_scatter = self.ax.plot(
             xs, ys, zs, color='red', linewidth=3)[0]
-
         # Draw target if set
         if self.target_point is not None:
             if self.target_scatter:
