@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Interactive 5-DOF Robotic Arm Visualizer
 
@@ -21,15 +20,24 @@ Controls:
 
 Author: Generated for visarm project
 """
-
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button, Slider
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Line3D
 import sympy as sp
-from server.kinematics.visualServoing import VisualServoing
+from visualServoing import VisualServoing
 
+import serial
+import time
+
+ser = serial.Serial(
+    '/dev/ttyACM1',  
+    baudrate=115200,
+    timeout=1
+)
+
+# time.sleep(2) 
 
 class ArmVisualizer:
     def __init__(self):
@@ -113,8 +121,9 @@ class ArmVisualizer:
                 slider_left, 0.75 - i*0.12, slider_width, slider_height
             ])
             lo, hi = self.kin.joint_limits[i]
+            label = f"J{i+1} [{lo}°, {hi}°]" 
             slider = Slider(
-                ax_slider, f'J{i+1}', lo, hi,
+                ax_slider, label, lo, hi,
                 valinit=self.joint_angles[i], valstep=1.0
             )
             slider.on_changed(
@@ -133,11 +142,12 @@ class ArmVisualizer:
 
         # Info text
         self.info_text = self.fig.text(
-            0.82, 0.25, '',
-            fontsize=9,
+            0.05, 0.25, '',
+            fontsize=11,
             family='monospace',
             verticalalignment='top'
         )
+
 
     def compute_link_positions(self, joint_angles):
         """Compute link positions for the 2-joint configuration."""
@@ -234,15 +244,19 @@ class ArmVisualizer:
         if self.target_point is not None:
             target_str = f"[{self.target_point[0]:.1f}, {self.target_point[1]:.1f}, {self.target_point[2]:.1f}]"
 
-        info = f"Joint Angles (°):\n"
+        # Build table-like text
+        info  = "Joint   | Angle (°)\n"
+        info += "-------------------\n"
         for i, angle in enumerate(self.joint_angles):
-            info += f"  J{i+1}: {angle:6.1f}\n"
-        info += f"\nEE Position: {ee_pos_str}\n"
-        info += f"Target: {target_str}\n"
+            info += f"J{i+1:<6}| {angle:6.1f}\n"
+
+        info += "\nEE Pos  | " + ee_pos_str + "\n"
+        info += "Target  | " + target_str + "\n"
 
         if self.target_point is not None:
             dist = np.linalg.norm(ee_pos - self.target_point)
-            info += f"Error: {dist:.2f} cm"
+            info += f"Error   | {dist:.2f} cm"
+
 
         self.info_text.set_text(info)
 
@@ -255,6 +269,16 @@ class ArmVisualizer:
         # Redraw
         self.ax.legend(loc='upper left')
         self.fig.canvas.draw_idle()
+
+        # send to robot
+        angles = self.joint_angles
+
+        cmd = "SET " + " ".join(str(int(a)) for a in angles) + " 0\n"
+        ser.write(cmd.encode('utf-8'))
+        print("Command sent:", cmd.strip())
+
+        response = ser.readline().decode('utf-8').strip()
+        print("Arm replied:", response)
 
     def on_slider_change(self, joint_idx, value):
         """Handle slider change event."""
@@ -317,7 +341,7 @@ class ArmVisualizer:
 
     def reset_to_home(self, event=None):
         """Reset arm to home position (2 joints)."""
-        self.joint_angles = np.array([0.0, 0.0])
+        self.joint_angles = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
         self.target_point = None
         if self.target_scatter:
             self.target_scatter.remove()
@@ -393,6 +417,9 @@ def main():
     """Main entry point."""
     visualizer = ArmVisualizer()
     visualizer.run()
+
+    ser.close()
+
 
 
 if __name__ == "__main__":
