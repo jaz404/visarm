@@ -21,6 +21,8 @@ private:
   
   std::string sendCommand(const std::string &cmd);
   std::vector<std::string> findSerialPorts();
+  std::string readLine(int timeout_ms);
+  std::vector<double> parseAngles(const std::string &line);
   vpHomogeneousMatrix dhTransform(double a, double alpha, double d, double theta);
   bool openSerialPort(const std::string &port);
 
@@ -34,6 +36,7 @@ public:
   vpHomogeneousMatrix get_eMc();
   vpHomogeneousMatrix getBaseToCamera();
   vpPoseVector getPoseVector();
+  vpHomogeneousMatrix get_rMe();
   bool setJointAngles(const std::vector<double> &angles);
   bool setHome();
   void disconnect();

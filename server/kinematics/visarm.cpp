@@ -9,6 +9,7 @@
 #include <dirent.h>
 #include <thread>
 #include <chrono>
+#include <cctype>
 
 // Constructor
 VisArm::VisArm() : serial_fd(-1), current_angles(5, 0.0) {
@@ -29,26 +30,66 @@ VisArm::~VisArm() {
   disconnect();
 }
 
-std::string VisArm::sendCommand(const std::string &cmd) {
+std::string trim(const std::string &s)
+{
+    size_t a = s.find_first_not_of(" \r\n\t");
+    size_t b = s.find_last_not_of(" \r\n\t");
+    if (a == std::string::npos) return "";
+    return s.substr(a, b - a + 1);
+}
+
+std::string VisArm::sendCommand(const std::string &cmd)
+{
     if (serial_fd < 0) {
-      std::cerr << "[VisArm] Serial port not connected" << std::endl;
-      return "";
+        std::cerr << "[VisArm] Serial not connected\n";
+        return "";
     }
-    
-    std::string full_cmd = cmd + "\n";
-    write(serial_fd, full_cmd.c_str(), full_cmd.length());
-    
-    // Wait for response
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    
-    char buffer[1024] = {0};
-    int bytes_read = read(serial_fd, buffer, sizeof(buffer) - 1);
-    if (bytes_read > 0) {
-      buffer[bytes_read] = '\0';
-      return std::string(buffer);
+
+    tcflush(serial_fd, TCIFLUSH);
+
+    // Send command
+    std::string msg = cmd;
+    if (msg.back() != '\n') msg.push_back('\n');
+    write(serial_fd, msg.c_str(), msg.size());
+    tcdrain(serial_fd);
+
+    bool is_get = cmd.rfind("GET", 0) == 0;
+    bool is_set = cmd.rfind("SET", 0) == 0;
+    int timeout = is_set ? 10000 : 2000;
+
+    while (true)
+    {
+        std::string raw = readLine(timeout);
+        std::string line = trim(raw);
+
+        // std::cout << "[VisArm] << " << line << "\n";
+
+        // Success for SET
+        if (line == "READY" || line == "OK")
+            return line;
+
+        if (line.rfind("ANGLES", 0) == 0)
+            return line;
+
+        if (line.rfind("ERR", 0) == 0)
+            return line;
     }
-    return "";
-  }
+}
+
+std::vector<double> VisArm::parseAngles(const std::string &line)
+{
+    std::vector<double> a;
+    std::istringstream iss(line);
+    std::string tag;
+    iss >> tag;   // "ANGLES"
+
+    double v;
+    while (iss >> v)
+        a.push_back(v);
+
+    return a;
+}
+
 
 std::vector<std::string> VisArm::findSerialPorts() {
     std::vector<std::string> ports;
@@ -195,42 +236,20 @@ bool VisArm::openSerialPort(const std::string &port) {
 // -------------------------------------------------------------------------
 // 2. Read the 5 joint angles from the robot (we use 5 joints, not counting gripper)
 // -------------------------------------------------------------------------
-std::vector<double> VisArm::getJointAngles() {
-    std::string response = sendCommand("GET");
-    
-    if (response.empty()) {
-      std::cerr << "[VisArm] No response from GET command" << std::endl;
-      return current_angles;
+std::vector<double> VisArm::getJointAngles()
+{
+    std::string resp = sendCommand("GET");
+    if (resp.rfind("ANGLES", 0) != 0) {
+        std::cerr << "[VisArm] Invalid GET response: " << resp << "\n";
+        return current_angles;
     }
-    
-    std::istringstream iss(response);
-    std::string prefix;
-    iss >> prefix;
-    
-    if (prefix.find("ANGLES") != std::string::npos) {
-      std::vector<double> angles;
-      double angle;
-      int count = 0;
-      
-      while (iss >> angle && count < 7) {
-        angles.push_back(angle);
-        count++;
-      }
-      
-      if (count >= 5) {
-        current_angles = std::vector<double>(angles.begin(), angles.begin() + 5);
-        std::cout << "[VisArm] Joint angles: ";
-        for (size_t i = 0; i < current_angles.size(); i++) {
-          std::cout << current_angles[i] << " ";
-        }
-        std::cout << std::endl;
-      } else {
-        std::cerr << "[VisArm] Not enough angles received: " << count << std::endl;
-      }
-    }
-    
+
+    auto a = parseAngles(resp);
+    if (a.size() >= 5)
+        current_angles = {a[0], a[1], a[2], a[3], a[4]};
+
     return current_angles;
-  }
+}
 
 // -------------------------------------------------------------------------
 // 3. Forward kinematics from base → end-effector
@@ -271,17 +290,35 @@ vpHomogeneousMatrix VisArm::fkine(const std::vector<double> &q) {
 vpHomogeneousMatrix VisArm::get_eMc() {
     vpTranslationVector t(10.0, 0, 0);
     
-    vpRxyzVector rxyz(-M_PI/2, 0, 0);
+    vpRxyzVector rxyz(0, 0, -M_PI);
     vpRotationMatrix R(rxyz);
     
     return vpHomogeneousMatrix(t, R);
   }
+
+
+vpHomogeneousMatrix VisArm::get_rMe(){
+    std::vector<double> q = getJointAngles();
+    std::cout << "[VISARM] Joint angles for FK: ";
+    for (size_t i = 0; i < q.size(); i++) {
+      std::cout << q[i] << " ";
+    }
+    std::cout << std::endl;
+    
+    return fkine(q);
+}
 
 // -------------------------------------------------------------------------
 // 5. Combined base → camera
 // -------------------------------------------------------------------------
 vpHomogeneousMatrix VisArm::getBaseToCamera() {
     std::vector<double> q = getJointAngles();
+    std::cout << "[VISARM] Joint angles for FK: ";
+    for (size_t i = 0; i < q.size(); i++) {
+      std::cout << q[i] << " ";
+    }
+    std::cout << std::endl;
+    
     return fkine(q) * get_eMc();
   }
 
@@ -289,7 +326,7 @@ vpHomogeneousMatrix VisArm::getBaseToCamera() {
 // 6. Position in vpPoseVector (for saving YAML)
 // -------------------------------------------------------------------------
 vpPoseVector VisArm::getPoseVector() {
-    vpHomogeneousMatrix M = getBaseToCamera();
+    vpHomogeneousMatrix M = get_rMe();
     return vpPoseVector(M);
   }
 
@@ -297,32 +334,109 @@ vpPoseVector VisArm::getPoseVector() {
 // 7. Set joint angles on the robot
 // -------------------------------------------------------------------------
 bool VisArm::setJointAngles(const std::vector<double> &angles) {
-    if (angles.size() < 6) {
-      std::cerr << "[VisArm] setJointAngles requires 6 angles" << std::endl;
-      return false;
-    }
-    
-    std::ostringstream oss;
-    oss << "SET ";
-    for (size_t i = 0; i < 6; i++) {
-      oss << angles[i] << " ";
-    }
-    
-    std::string response = sendCommand(oss.str());
-    if (response.find("OK") != std::string::npos) {
-      std::cout << "[VisArm] Joint angles set successfully" << std::endl;
-      return true;
+  if (angles.size() < 6) {
+    std::cerr << "[VisArm] setJointAngles requires 6 angles" << std::endl;
+    return false;
+  }
+  if (serial_fd < 0) {
+    std::cerr << "[VisArm] Serial port not connected" << std::endl;
+    return false;
+  }
+
+  // Mimic Python behavior:
+  // cmd = "SET " + " ".join(str(int(a)) for a in angles) + " 0\n"
+  // ser.write(cmd); line = ser.readline()
+
+  // Flush any pending input
+  tcflush(serial_fd, TCIFLUSH);
+
+  std::ostringstream cmd;
+  cmd << "SET ";
+  for (size_t i = 0; i < 6; ++i) {
+    int ai = static_cast<int>(std::lround(angles[i]));
+    cmd << ai << " ";
+  }
+  cmd << 0 << "\n"; // trailing 0 like Python code
+
+  std::string cmd_str = cmd.str();
+  ssize_t w = write(serial_fd, cmd_str.c_str(), cmd_str.size());
+  (void)w;
+  tcdrain(serial_fd);
+
+  // Read lines up to a generous timeout (servo motions can be long)
+  const auto timeout = std::chrono::seconds(30);
+  auto start = std::chrono::steady_clock::now();
+  std::string line;
+  std::string full_log;
+  char ch;
+  while (std::chrono::steady_clock::now() - start < timeout) {
+    int n = read(serial_fd, &ch, 1);
+    if (n == 1) {
+      if (ch == '\r') continue; // ignore CR
+      if (ch == '\n') {
+        if (!line.empty()) {
+          full_log += line + "\n";
+          // Debug echo
+          // std::cout << "[VisArm] Line: '" << line << "'" << std::endl;
+          // Status checks
+          if (line.find("ERR") != std::string::npos) {
+            std::cerr << "[VisArm] Error reported." << std::endl;
+            return false;
+          }
+          if (line.find("READY") != std::string::npos || line.find("OK") != std::string::npos) {
+            std::cout << "[VisArm] Motion complete (" << (line.find("READY") != std::string::npos ? "READY" : "OK") << ")." << std::endl;
+            return true;
+          }
+          // Ignore RAW and COUNT lines; continue accumulating
+          line.clear();
+        }
+        continue;
+      }
+      line.push_back(ch);
+      // Safeguard against extremely long lines
+      if (line.size() > 512) {
+        full_log += line + "\n";
+        line.clear();
+      }
     } else {
-      std::cerr << "[VisArm] Failed to set joint angles" << std::endl;
-      std::cout << "[VisArm] Response: " << response << std::endl;
-      return false;
+      // No data yet; brief sleep
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
+  std::cerr << "[VisArm] Timeout waiting for READY. Collected output:\n" << full_log << std::endl;
+  return false;
+}
 
 bool VisArm::setHome(){
     std::vector<double> home_angles = {0, 0, 0, 0, 0, 0};
     return setJointAngles(home_angles);
   }
+
+std::string VisArm::readLine(int timeout_ms)
+{
+    std::string line;
+    char c;
+
+    auto start = std::chrono::steady_clock::now();
+
+    while (std::chrono::steady_clock::now() - start <
+           std::chrono::milliseconds(timeout_ms))
+    {
+        int n = read(serial_fd, &c, 1);
+        if (n == 1)
+        {
+            if (c == '\r') continue;
+            if (c == '\n') return line;
+            line.push_back(c);
+        }
+        else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+    }
+
+    return "";  // timeout
+}
+
 
 // -------------------------------------------------------------------------
 // 8. Disconnect from robot

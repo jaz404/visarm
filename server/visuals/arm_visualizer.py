@@ -23,8 +23,6 @@ Author: Generated for visarm project
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button, Slider
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Line3D
 import sympy as sp
 from visualServoing import VisualServoing
 
@@ -33,12 +31,10 @@ import time
 
 # will need to change if port changes
 ser = serial.Serial(
-    '/dev/ttyACM1',  
+    '/dev/ttyACM0',  
     baudrate=115200,
     timeout=1
 )
-
-# time.sleep(2) 
 
 class ArmVisualizer:
     def __init__(self):

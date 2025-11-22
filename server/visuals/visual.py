@@ -149,8 +149,8 @@ def main():
         print(f"Camera initialization failed: {e}", file=sys.stderr)
         sys.exit(1)
 
-    detector = ObjectDetector(
-        model_path=args.model, classes_path=args.classes, conf_threshold=args.conf)
+    # detector = ObjectDetector(
+    #     model_path=args.model, classes_path=args.classes, conf_threshold=args.conf)
 
     print(f"Using camera: {args.camera}")
     if args.camera == 'realsense':
@@ -159,22 +159,22 @@ def main():
     try:
         while True:
             color_frame, depth_frame = camera.get_frame()
-            detections = detector.detect_objects(
-                (color_frame, depth_frame), depth_image=depth_frame, depth_scale=camera.depth_scale)
+            # detections = detector.detect_objects(
+                # (color_frame, depth_frame), depth_image=depth_frame, depth_scale=camera.depth_scale)
 
             # Draw detections on color frame
-            for det in detections:
-                x1, y1, x2, y2 = det['bbox']
-                conf = det['confidence']
-                cls_id = det['class_id']
-                cls_name = det['class_name'] if det['class_name'] else 'Unknown'
-                distance_m = det['distance_m']
-                cv2.rectangle(color_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                label = f'ID:{cls_id} {cls_name} {conf:.2f}'
-                if distance_m is not None:
-                    label += f' {distance_m:.2f}m'
-                cv2.putText(color_frame, label, (x1, max(0, y1 - 10)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            # for det in detections:
+            #     x1, y1, x2, y2 = det['bbox']
+            #     conf = det['confidence']
+            #     cls_id = det['class_id']
+            #     cls_name = det['class_name'] if det['class_name'] else 'Unknown'
+            #     distance_m = det['distance_m']
+            #     cv2.rectangle(color_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            #     label = f'ID:{cls_id} {cls_name} {conf:.2f}'
+            #     if distance_m is not None:
+            #         label += f' {distance_m:.2f}m'
+            #     cv2.putText(color_frame, label, (x1, max(0, y1 - 10)),
+            #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
             cv2.imshow('Object Detection', color_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
