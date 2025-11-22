@@ -63,3 +63,6 @@ Substituting values we get:
 | 5        | θ<sub>5</sub>      | 0             | 9                     | 0                       |
 
 ## Forward kinematics:
+
+./tutorial-chessboard-pose --square_size 0.0260 --input "/home/krupal/Documents/class files/CMPUT 312/final_project/visarm/server/output/image_%d.png" --intrinsic "/home/krupal/Documents/class files/CMPUT 312/final_project/visarm/server/output/custom_camera.xml" --output "/home/krupal/Documents/class files/CMPUT 312/final_project/visarm/server/output/pose_cPo_%d.yaml"
+./tutorial-hand-eye-calibration --data-path "/home/krupal/Documents/class files/CMPUT 312/final_project/visarm/server/output" --fPe pose_rPe_%d.yaml --cPo pose_cPo_%d.yaml --output "/home/krupal/Documents/class files/CMPUT 312/final_project/visarm/server/output/visarm_final_cal_output.yaml"

@@ -133,16 +133,20 @@ int main(int argc, const char **argv)
 
     // Poses to go to
     std::vector<std::vector<double>> poses = {
-        {7, 17, 79, 34, 0, 0},
-        {7, 54, 90, 55, 0, 0},
-        {-4, 48, 90, 55, 0, 0},
-        {12, 55, 90, 55, 0, 0},
-        {18, 53, 63, 90, 0, 0},
-        {-10, 53, 57, 90, 30, 0},
-        {5, -32, -17, 90, 0, 0},
-        {6, -32, 5, 62, 0, 0},
-        {9, -32, 37, 27, 0, 0},
-        {7, 0, 88, 0, 0, 0},
+        // {7, 17, 79, 34, 20, 0},
+        // {7, 54, 90, 55, 10, 0},
+        // {-4, 48, 90, 55, 30, 0},
+        // {12, 55, 90, 55, 40, 0},
+        // {18, 53, 63, 90, 80, 0},
+        // {-10, 53, 57, 90, 30, 0},
+        // {5, -32, -17, 90, 50, 0},
+        // {6, -32, 5, 62, 30, 0},
+        // {9, -32, 37, 27, 40, 0},
+        // {7, 0, 88, 0, 20, 0},
+        // {4, -26, 29, 46, 10, 0},
+        {-4, 53, 90, 72, 68,0},
+        // {12, 35, 71,72, 68, 0},
+        // {13, 19, 43, 72, 0, 0},
     };
 
     // -----------------------------------------------------------------------
@@ -196,9 +200,11 @@ int main(int argc, const char **argv)
       vpPoseVector pose = robot.getPoseVector();
 
       std::stringstream img_name, pose_name;
-      img_name << opt_output_folder << "/image_" << i + 1 << ".png";
-      pose_name << opt_output_folder << "/pose_" << i + 1 << ".yaml";
-
+      // img_name << opt_output_folder << "/image_" << i + 1 << ".png";
+      // pose_name << opt_output_folder << "/pose_rPe" << i + 1 << ".yaml";
+      img_name << opt_output_folder << "/image_12.png";
+      pose_name << opt_output_folder << "/pose_rPe12.yaml";
+      
       std::cout << "Saving " << img_name.str()
                 << " + " << pose_name.str() << "\n";
 
