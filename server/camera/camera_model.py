@@ -1,5 +1,6 @@
 import json
 import numpy as np
+import cv2
 
 def load_camera(filename="camera_params.json"):
     with open(filename, "r") as f:
@@ -47,30 +48,23 @@ def pixel_to_robot(u, v, K, R, t, T_O_from_checker):
 
     return P_robot[:3]
 
-
-
-import json
-import numpy as np
-import cv2
-
 def compute_camera_pose(get_raw_image_fn, K, dist_coeffs, world_points, pattern_size):
     """
     Replicates MATLAB calculateCameraPos().
     Detects checkerboard → solves PnP → returns (R, t, pose4x4).
     """
 
-    # 1. Capture image
     raw = get_raw_image_fn()
 
-    # 2. Undistort
+    # Undistort
     img = cv2.undistort(raw, K, dist_coeffs)
 
-    # 3. Detect checkerboard
+    # Detect checkerboard
     ret, corners = cv2.findChessboardCorners(img, pattern_size)
     if not ret:
         raise RuntimeError("Checkerboard NOT detected")
 
-    # 3b. Sub-pixel refinement (optional but recommended)
+    # Sub-pixel refinement 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     corners = cv2.cornerSubPix(
         gray,
@@ -84,11 +78,11 @@ def compute_camera_pose(get_raw_image_fn, K, dist_coeffs, world_points, pattern_
         ),
     )
 
-    # 4. Prepare 3D world points (z = 0)
+    # repare 3D world points (z = 0)
     world_points = np.array(world_points, dtype=np.float32)
     objp = np.hstack([world_points, np.zeros((len(world_points), 1), dtype=np.float32)])
 
-    # 5. Solve extrinsics (PnP)
+    # Solve extrinsics (PnP)
     ok, rvec, tvec = cv2.solvePnP(objp, corners, K, dist_coeffs)
     if not ok:
         raise RuntimeError("solvePnP failed")

@@ -1,5 +1,8 @@
 import numpy as np
 
+import matplotlib.pyplot as plt
+import numpy as np
+
 def compute_checkerboard_errors(corners, world_points, K, R, t, T_O_from_checker, pixel_to_robot_fn):
     """
     Compute positional errors (in robot coordinates) for all checkerboard inner corners.
@@ -86,8 +89,6 @@ print("Max error    :", errors["max_error"],  "mm")
 print("RMS error    :", errors["rms_error"],  "mm")
 print("===============================================")
 
-import matplotlib.pyplot as plt
-import numpy as np
 
 def visualize_checkerboard_errors(errors, title="Checkerboard Robot-Frame Error"):
     theory = errors["theory_robot_pts"]

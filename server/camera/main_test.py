@@ -18,7 +18,6 @@ HSV_DARK_GREEN = {
 import select
 
 def user_input_available():
-    """Returns True if the user typed something in the terminal (non-blocking)."""
     return select.select([sys.stdin], [], [], 0)[0] != []
 
 def main():

@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
-
+from camera import Camera
+from image_processing import ImageProcessing
 
 class ImageProcessing:
     def __init__(self, K, dist, outline_px):
@@ -67,9 +68,7 @@ class ImageProcessing:
         if len(contours) == 0:
             return [], mask
 
-        # -----------------------------------------------------
         # Choose the STRONGEST detection = largest area contour
-        # -----------------------------------------------------
         contours = sorted(contours, key=cv2.contourArea, reverse=True)
         cnt = contours[0]          # strongest one
         area = cv2.contourArea(cnt)
@@ -87,12 +86,6 @@ class ImageProcessing:
         cy = int(M["m01"] / M["m00"])
 
         return [(cx, cy)], mask
-
-
-from camera import Camera
-import cv2
-from camera import Camera
-from image_processing import ImageProcessing
 
 def main():
     cam = Camera("camera_params.json")
