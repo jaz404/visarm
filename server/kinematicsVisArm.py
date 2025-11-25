@@ -1,11 +1,10 @@
 import numpy as np
 import sympy as sp
 import math
-import itertools
-from scipy.optimize import least_squares
+import variables as v
 
 
-class VisualServoing:
+class KinematicsVisArm:
     def __init__(self,
                  ll: list = None,
                  dh_params: list = None,
@@ -72,9 +71,10 @@ class VisualServoing:
         else:
             t0 = np.eye(4)
 
-        t0[0, 3] = self.initial_offset[0]
-        t0[1, 3] = self.initial_offset[1]
-        t0[2, 3] = self.initial_offset[2]
+        if self.initial_offset is not None:
+            t0[0, 3] = self.initial_offset[0]
+            t0[1, 3] = self.initial_offset[1]
+            t0[2, 3] = self.initial_offset[2]
 
         transforms.append(t0)
 
@@ -214,6 +214,11 @@ class VisualServoing:
         print(
             f"Found {len(solutions)} solutions after sweeping phi and filtering.")
         solutions.sort(key=lambda x: x[1])
+        # Add offset to all solutions if needed
+        offset = [np.radians(-8), 0, 0, 0, 0]
+        for sol in solutions:
+            sol[0] = [self._wrap_angle(sol[0][i] + np.radians(offset[i]))
+                      for i in range(len(sol[0]))]
         return solutions
 
     def _wrap_angle(self, angle):
@@ -235,6 +240,7 @@ class VisualServoing:
             if angle < min_limit or angle > max_limit:
                 return False
         return True
+
 
 def round_trip_test(kin, n=100):
     ok = True
@@ -272,33 +278,18 @@ def round_trip_test(kin, n=100):
 
 
 def main():
-    ll = [10.5, 12.9, 11.0, 0.0, 2.5, 15.0]
-    theta_symbols = sp.symbols('θ1 θ2 θ3 θ4 θ5')
-    initial_offset = [0, 0, 0]
-    dh_params = [
-        {'a': 0, 'alpha': np.pi/2, 'd': ll[0], 'theta': theta_symbols[0]},
-        {'a': ll[1], 'alpha': 0, 'd': 0, 'theta': theta_symbols[1] + np.pi/2},
-        {'a': ll[2], 'alpha': 0, 'd': 0, 'theta': -theta_symbols[2]},
-        {'a': ll[4], 'alpha': np.pi/2, 'd': 0,
-            'theta': -theta_symbols[3] + np.pi/2},
-        {'a': 0, 'alpha': 0, 'd': ll[3] + ll[5], 'theta': theta_symbols[4]},
-    ]
-    joint_limits = [(-80, 90), (-80, 80), (-90, 90), (-90, 90), (-90, 90)]
-    joint_limits = [(np.radians(lo), np.radians(hi))
-                    for (lo, hi) in joint_limits]
-
-    kin = VisualServoing(
-        ll=ll,
-        dh_params=dh_params,
-        joint_limits=joint_limits,
-        variables=theta_symbols,
-        initial_offset=initial_offset
+    kin = KinematicsVisArm(
+        ll=v.ll,
+        dh_params=v.dh_params,
+        joint_limits=v.joint_limits_rad,
+        variables=v.theta_symbols,
+        initial_offset=v.initial_offset
     )
 
-    angle3 = [0, -45, 80, 45, 0]
-    start_pos_3 = np.deg2rad(angle3)
-    end_eff_pos_3 = kin.forward_kinematics(start_pos_3)
-    print(f"End Effector Position for joints {angle3}:")
+    angle = [0, -45, 80, 45, 0]
+    start_pos = np.deg2rad(angle)
+    end_eff_pos_3 = kin.forward_kinematics(start_pos)
+    print(f"End Effector Position for joints {angle}:")
     print(np.round(end_eff_pos_3, 3))
     pos3 = end_eff_pos_3[0:3, 3]
 

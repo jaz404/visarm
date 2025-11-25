@@ -24,44 +24,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button, Slider
 import sympy as sp
-from visualServoing import VisualServoing
+import visarm
+import variables as v
 
-import serial
-import time
+vis = visarm.VisArm()
+vis.connect()
 
-# will need to change if port changes
-ser = serial.Serial(
-    '/dev/ttyACM0',  
-    baudrate=115200,
-    timeout=1
-)
 
 class ArmVisualizer:
     def __init__(self):
         """Initialize a simplified 2-DOF arm visualizer (first two joints only)."""
-        ll = [2.0, 10.3, 9.6, 4.0, 2.5, 5.0]
-        theta_symbols = sp.symbols('θ1 θ2 θ3 θ4 θ5')
-        initial_offset = [0, 0, 9.5]
-        dh_params = [
-            {'a': 0, 'alpha': 90, 'd': ll[0], 'theta': theta_symbols[0]},
-            {'a': ll[1], 'alpha': 0, 'd': 0,
-                'theta': theta_symbols[1] + np.pi/2},
-            {'a': ll[2], 'alpha': 0, 'd': 0, 'theta': -theta_symbols[2]},
-            {'a': ll[4], 'alpha': 90, 'd': 0,
-                'theta': -theta_symbols[3] + np.pi/2},
-            {'a': 0, 'alpha': 0, 'd': ll[3] +
-                ll[5], 'theta': theta_symbols[4]},
-        ]
-        joint_limits = [(-80, 90), (-80, 80), (-90, 90), (-90, 90), (-90, 90)]
-
-        self.kin = VisualServoing(
-            ll=ll,
-            dh_params=dh_params,
-            joint_limits=joint_limits,
-            variables=theta_symbols,
-            initial_offset=initial_offset
-        )
-
+        self.kin = vis.kinematics
         self.joint_angles = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
 
         # Target point
@@ -117,8 +90,8 @@ class ArmVisualizer:
             ax_slider = plt.axes([
                 slider_left, 0.75 - i*0.12, slider_width, slider_height
             ])
-            lo, hi = self.kin.joint_limits[i]
-            label = f"J{i+1} [{lo}°, {hi}°]" 
+            lo, hi = v.joint_limits_deg[i]
+            label = f"J{i+1} [{lo}°, {hi}°]"
             slider = Slider(
                 ax_slider, label, lo, hi,
                 valinit=self.joint_angles[i], valstep=1.0
@@ -144,7 +117,6 @@ class ArmVisualizer:
             family='monospace',
             verticalalignment='top'
         )
-
 
     def compute_link_positions(self, joint_angles):
         """Compute link positions for the 2-joint configuration."""
@@ -241,7 +213,7 @@ class ArmVisualizer:
             target_str = f"[{self.target_point[0]:.1f}, {self.target_point[1]:.1f}, {self.target_point[2]:.1f}]"
 
         # Build table-like text
-        info  = "Joint   | Angle (°)\n"
+        info = "Joint   | Angle (°)\n"
         info += "-------------------\n"
         for i, angle in enumerate(self.joint_angles):
             info += f"J{i+1:<6}| {angle:6.1f}\n"
@@ -252,7 +224,6 @@ class ArmVisualizer:
         if self.target_point is not None:
             dist = np.linalg.norm(ee_pos - self.target_point)
             info += f"Error   | {dist:.2f} cm"
-
 
         self.info_text.set_text(info)
 
@@ -268,13 +239,7 @@ class ArmVisualizer:
 
         # send to robot
         angles = self.joint_angles
-
-        cmd = "SET " + " ".join(str(int(a)) for a in angles) + " 0\n"
-        ser.write(cmd.encode('utf-8'))
-        print("Command sent:", cmd.strip())
-
-        response = ser.readline().decode('utf-8').strip()
-        print("Arm replied:", response)
+        vis.set_joint_angles(angles)
 
     def on_slider_change(self, joint_idx, value):
         """Handle slider change event."""
@@ -310,11 +275,32 @@ class ArmVisualizer:
                 print(f"Target set to: [{x:.2f}, {y:.2f}, {z:.2f}]")
 
                 # Try to move arm to target
-                # self.move_to_target()
+                self.move_to_target()
 
     def move_to_target(self):
-        """(Disabled) IK movement not supported in 2-joint mode."""
-        print("IK move disabled for 2-joint visualization.")
+        """Move the arm to the target point using IK."""
+
+        if self.target_point is None:
+            return
+
+        T_target = np.eye(4)
+        T_target[:3, 3] = self.target_point
+
+        T_target[:3, :3] = np.array([
+            [0, 0, 1],
+            [0, -1, 0],
+            [1, 0, 0]
+        ])
+
+        try:
+            joint_angles_ik = self.kin.inverse_kinematics_analytic(T_target)
+            self.joint_angles = joint_angles_ik
+            self.update_arm()
+            print(f"IK solution: {joint_angles_ik}")
+
+        except Exception as e:
+            print(f"IK failed: {e}")
+            print("Target may be unreachable")
 
     def on_key(self, event):
         """Handle keyboard events."""
@@ -414,8 +400,7 @@ def main():
     visualizer = ArmVisualizer()
     visualizer.run()
 
-    ser.close()
-
+    vis.disconnect()
 
 
 if __name__ == "__main__":
