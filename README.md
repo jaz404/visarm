@@ -66,3 +66,25 @@ Substituting values we get:
 
 ./tutorial-chessboard-pose --square_size 0.0260 --input "/home/krupal/Documents/class files/CMPUT 312/final_project/visarm/server/output/image_%d.png" --intrinsic "/home/krupal/Documents/class files/CMPUT 312/final_project/visarm/server/output/custom_camera.xml" --output "/home/krupal/Documents/class files/CMPUT 312/final_project/visarm/server/output/pose_cPo_%d.yaml"
 ./tutorial-hand-eye-calibration --data-path "/home/krupal/Documents/class files/CMPUT 312/final_project/visarm/server/output" --fPe pose_rPe_%d.yaml --cPo pose_cPo_%d.yaml --output "/home/krupal/Documents/class files/CMPUT 312/final_project/visarm/server/output/visarm_final_cal_output.yaml"
+
+## Origin Position:
+This position is the inital value for all the joint of the robots to get the true values from the servos. 
+| Motor | Joint Name        | Angle (°)|
+| ----- | ----------------- |-|
+| 1     | Base (ch 0)       | 0|
+| 2     | Shoulder (ch 1)   | 0|
+| 3     | Elbow (ch 2)      | 0|
+| 4     | Wrist Roll (ch 3) | 0|
+| 5     | Wrist Yaw (ch 4)  | 0|
+| 6     | Gripper (ch 5)    | 0|
+
+## Survey Position:
+This position provides a full view of the workspace(checkerboard) and the all objects should be visible.
+| Motor | Joint Name        | Angle (°) |
+|-------|-------------------|-----------|
+| 1     | Base (ch 0)       | -6        |
+| 2     | Shoulder (ch 1)   | 29        |
+| 3     | Elbow (ch 2)      | 77        |
+| 4     | Wrist Roll (ch 3) | 90        |
+| 5     | Wrist Yaw (ch 4)  | -10       |
+| 6     | Gripper (ch 5)    | —         |

@@ -162,7 +162,7 @@ class VisArm:
         mod_angles = self.clamp_joint_angles(angles)
 
         cmd_parts = ["SET"]
-        for a in mod_angles[:5]:
+        for a in mod_angles[:6]:
             cmd_parts.append(str(int(round(a))))
         cmd_parts.append("0")
 
@@ -179,7 +179,11 @@ class VisArm:
         return False
 
     def set_home(self):
-        return self.set_joint_angles([-2, 0, 53, 90, 0, 0])
+        return self.set_joint_angles([0,0,0,0,0,0])
+    
+
+    def set_survey(self):
+        return self.set_joint_angles([-6, 29,77, 90, -10])
 
     def fkine(self, q):
         return self.kinematics.forward_kinematics(q)
@@ -209,33 +213,35 @@ def main():
     visarm = VisArm()
     if not visarm.connect():
         return
+    # set to survey position
+    visarm.set_joint_angles([-6, 29,77, 90, -10])
 
-    print("[VisArm] Current joint angles:", visarm.get_joint_angles())
-    print("[VisArm] Moving to home position...")
-    if visarm.set_home():
-        angles = visarm.get_joint_angles()
-        print("[VisArm] Moved to home position. Current angles:", angles)
-        if angles == [-2.0, 0.0, 53.0, 90.0, 0.0]:
-            print("[VisArm] Home position reached.")
-        else:
-            print("[VisArm] Home position not reached accurately.")
-    else:
-        print("[VisArm] Failed to move to home position.")
+    # print("[VisArm] Current joint angles:", visarm.get_joint_angles())
+    # print("[VisArm] Moving to home position...")
+    # if visarm.set_home():
+    #     angles = visarm.get_joint_angles()
+    #     print("[VisArm] Moved to home position. Current angles:", angles)
+    #     if angles == [-2.0, 0.0, 53.0, 90.0, 0.0]:
+    #         print("[VisArm] Home position reached.")
+    #     else:
+    #         print("[VisArm] Home position not reached accurately.")
+    # else:
+    #     print("[VisArm] Failed to move to home position.")
 
-    pos3 = np.array([30.5, 11.7, 5])
-    print(f"[VisArm] Computing IK for target position: {pos3}")
-    ik_solution = visarm.inv_kinematics(pos3)
-    if ik_solution:
-        best_angles, best_err = min(ik_solution, key=lambda x: x[1])
-        print(np.round(np.degrees(best_angles), 3),
-              f"with pos error: {best_err:.4f} cm")
-        print("[VisArm] Moving to IK solution...")
-        if visarm.set_joint_angles(np.degrees(best_angles)):
-            print("[VisArm] Move successful.")
-    else:
-        print("[VisArm] No IK solution found.")
-    time.sleep(20)
-    visarm.set_joint_angles([0, 0, 0, 0, 0])
+    # pos3 = np.array([30.5, 11.7, 5])
+    # print(f"[VisArm] Computing IK for target position: {pos3}")
+    # ik_solution = visarm.inv_kinematics(pos3)
+    # if ik_solution:
+    #     best_angles, best_err = min(ik_solution, key=lambda x: x[1])
+    #     print(np.round(np.degrees(best_angles), 3),
+    #           f"with pos error: {best_err:.4f} cm")
+    #     print("[VisArm] Moving to IK solution...")
+    #     if visarm.set_joint_angles(np.degrees(best_angles)):
+    #         print("[VisArm] Move successful.")
+    # else:
+    #     print("[VisArm] No IK solution found.")
+    # time.sleep(20)
+    # visarm.set_joint_angles([0, 0, 0, 0, 0])
 
     visarm.disconnect()
 
