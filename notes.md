@@ -171,10 +171,63 @@ $$
 
 #### Analytical Method
 
+##### Option 1: Failed
 We will try to extract a mathematical formula for the arm so that it is easy to compute. Our robot satifies the Pieper's law as the 2nd, 3rd and 4th joints are parallel and so we can find an analytical solution.
 
 - Assumption 1: The wrist position (Joint 4) depends on the first three joints. (0 to 3)
 - Assumption 2: The wrist orientation depends on the last two (that is joint 4 and joint 5). (The homogenous transformation from 5 to 3).
+
+This failed because the arm's 4 joint is not spherical, so it keeps changing. This causes the d5 value in the equation (W = P - d5*Z5) to keep changing based on the orientation of theta 4. Tried to do a brute force approach but didn't give very good results.
+
+##### Option 2: Brute force calulation using the transformation matrices:
+A simplified version of this looks as follows:
+[-cos(-θ₂ + θ₃ + θ₄))⋅cos(θ₁)⋅cos(θ₅) + sin(θ₁)⋅sin(θ₅), cos(-θ₂ + θ₃ + θ₄))⋅sin(θ₅)⋅cos(θ₁) + sin(θ₁)⋅cos(θ₅), sin(-θ₂ + θ₃ + θ₄)⋅cos(θ₁), (-10.3⋅sin(θ₂) - 9.6⋅sin(θ₂ - θ₃) + 9.0⋅sin(-θ₂ + θ₃ + θ₄) - 2.5⋅cos(-θ₂ + θ₃ + θ₄))⋅cos(θ₁)] = [R11, R12, R13, Px]
+[-cos(-θ₂ + θ₃ + θ₄))⋅sin(θ₁)⋅cos(θ₅) - sin(θ₅)⋅cos(θ₁), cos(-θ₂ + θ₃ + θ₄))⋅sin(θ₁)⋅sin(θ₅) - cos(θ₁)⋅cos(θ₅), sin(-θ₂ + θ₃ + θ₄)⋅sin(θ₁), (-10.3⋅sin(θ₂) - 9.6⋅sin(θ₂ - θ₃) + 9.0⋅sin(-θ₂ + θ₃ + θ₄) - 2.5⋅cos(-θ₂ + θ₃ + θ₄))⋅sin(θ₁)] = [R21, R22, R23, Py]
+[sin(-θ₂ + θ₃ + θ₄)⋅cos(θ₅), -sin(-θ₂ + θ₃ + θ₄)⋅sin(θ₅), cos(-θ₂ + θ₃ + θ₄), 10.3⋅cos(θ₂) + 9.6⋅cos(θ₂ - θ₃) + 9.0⋅cos(-θ₂ + θ₃ + θ₄) - 2.5⋅sin(-θ₂ + θ₃ + θ₄) + 11.5] = [R31, R32, R33, Pz]
+[0, 0, 0, 1] = [0, 0, 0, 1]
+
+Goal: To solve for the joint angles θ₁, θ₂, θ₃, θ₄, and θ₅ given a desired end-effector pose defined by the rotation matrix [R] and position vector [P].
+Equations:
+1. -cos(-θ₂ + θ₃ + θ₄))⋅cos(θ₁)⋅cos(θ₅) = R11
+2. -cos(-θ₂ + θ₃ + θ₄))⋅sin(θ₁)⋅cos(θ₅) = R21
+3. sin(-θ₂ + θ₃ + θ₄)⋅cos(θ₅) = R31
+4. cos(-θ₂ + θ₃ + θ₄))⋅sin(θ₁)⋅sin(θ₅) = R22
+5. -sin(θ₅)⋅cos(θ₁) = R12
+6. -sin(-θ₂ + θ₃ + θ₄)⋅sin(θ₅) = R32
+7. sin(-θ₂ + θ₃ + θ₄)⋅cos(θ₁) = R13
+8. sin(-θ₂ + θ₃ + θ₄)⋅sin(θ₁) = R23
+9. cos(-θ₂ + θ₃ + θ₄) = R33
+10. (-10.3⋅sin(θ₂) - 9.6⋅sin(θ₂ - θ₃) + 9.0⋅sin(-θ₂ + θ₃ + θ₄) - 2.5⋅cos(-θ₂ + θ₃ + θ₄))⋅cos(θ₁) = Px
+11. (-10.3⋅sin(θ₂) - 9.6⋅sin(θ₂ - θ₃) + 9.0⋅sin(-θ₂ + θ₃ + θ₄) - 2.5⋅cos(-θ₂ + θ₃ + θ₄))⋅sin(θ₁) = Py
+12. 10.3⋅cos(θ₂) + 9.6⋅cos(θ₂ - θ₃) + 9.0⋅cos(-θ₂ + θ₃ + θ₄) - 2.5⋅sin(-θ₂ + θ₃ + θ₄) + 11.5 = Pz
+
+Solutions:
+ϕ=-θ2+θ3+θ4
+Then the equations become:
+1. -cos(ϕ)⋅cos(θ₁)⋅cos(θ₅) = R11
+2. -cos(ϕ)⋅sin(θ₁)⋅cos(θ₅) = R21
+3. sin(ϕ)⋅cos(θ₅) = R31
+4. cos(ϕ)⋅sin(θ₁)⋅sin(θ₅) = R22
+5. -sin(θ₅)⋅cos(θ₁) = R12
+6. -sin(ϕ)⋅sin(θ₅) = R32
+7. sin(ϕ)⋅cos(θ₁) = R13
+8. sin(ϕ)⋅sin(θ₁) = R23
+9. cos(ϕ) = R33
+10. A⋅cos(θ₁) = Px
+11. A⋅sin(θ₁) = Py
+12. B = Pz
+
+Where:
+A = -10.3⋅sin(θ₂) - 9.6⋅sin(θ₂ - θ₃) + 9.0⋅sin(ϕ) - 2.5⋅cos(ϕ)
+B = 10.3⋅cos(θ₂) + 9.6⋅cos(θ₂ - θ₃) + 9.0⋅cos(ϕ) - 2.5⋅sin(ϕ) + 11.5
+
+θ₁ = atan2(Py, Px)
+θ₅ = atan2(-R12/cos(θ₁), -R11/(cos(ϕ)⋅cos(θ₁)))
+ϕ = atan2(R31, R33) or ϕ = acos(R33)
+θ4 = ϕ + θ2 - θ3
+Solve for θ2 and θ3 using equations 10, 11, and 12.
+
+This starts with an approximation, so it is not the best as there are some errors induced.
 
 ## References
 
@@ -187,3 +240,5 @@ We will try to extract a mathematical formula for the arm so that it is easy to 
 
 - https://moveit.github.io/moveit_tutorials/doc/hand_eye_calibration/hand_eye_calibration_tutorial.html
 - https://openrave.org/docs/0.8.0/openravepy/ikfast/
+
+Home Position: -2, 0, 53, 90, 0, 0
