@@ -95,8 +95,6 @@ def main():
             cv2.imshow("Processed View", processed)
             cv2.waitKey(1)
         except cv2.error:
-            # If GUI backend is not available (headless / missing Qt plugins)
-            # don't crash: continue processing but frames won't be visible.
             pass
 
         print(f"[SORTING] Detected {len(detected_objects)} objects.")
@@ -112,6 +110,31 @@ def main():
         for obj in detected_objects:
             cx, cy = obj['center']
             color = obj['color']
+            # Refresh GUI so frames remain visible during long operations
+            raw = cam.get_frame_raw()
+            processed, centers, _ = ip.process(raw, getattr(v, color))
+            for center in centers:
+                detected_objects.append({
+                    "color": color_name,
+                    "center": center,
+                    "bin_pos": bin_pos
+                })
+                # Draw on processed image for visualization
+                cx, cy = center
+                cv2.circle(processed, (cx, cy), 8, (0, 0, 255), -1)
+                cv2.putText(processed, color_name, (cx + 10, cy - 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+            # Ensure windows are created (helps some backends)
+            try:
+                cv2.namedWindow("Raw feed", cv2.WINDOW_NORMAL)
+                cv2.namedWindow("Processed View", cv2.WINDOW_NORMAL)
+                cv2.imshow("Raw feed", raw)
+                cv2.imshow("Processed View", processed)
+                cv2.waitKey(1)
+            except cv2.error:
+                pass
+
             print(f"[SORTING] Processing {color} object at {cx}, {cy}")
 
             # Calculate Robot Coordinates
