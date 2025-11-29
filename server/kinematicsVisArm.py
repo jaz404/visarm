@@ -115,7 +115,7 @@ class KinematicsVisArm:
         joints = joints.astype(np.float64)
         return joints
 
-    def ik(self, pos, debug=False):
+    def ik(self, pos, debug=False, offset=[0, 0, 0, 0, 0, 0]):
         x, y, z = pos
         l1, l2, l3, l4, l5, l6 = self.ll
 
@@ -224,6 +224,12 @@ class KinematicsVisArm:
                     t4 = self._wrap_angle(gamma1 + gamma2 + delta - phi)
 
                     geom_angles = [t1, t2, t3, t4, 0.0]
+
+                    # Apply offset (Error correction, gripper angle, etc.)
+                    for i in range(len(geom_angles)):
+                        geom_angles[i] += offset[i]
+                        geom_angles[i] = self._wrap_angle(geom_angles[i])
+
                     if debug:
                         print(
                             f"Geom Angles (rad): {geom_angles}, (deg): {np.degrees(geom_angles)}")

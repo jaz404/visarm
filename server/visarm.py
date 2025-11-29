@@ -219,7 +219,6 @@ class VisArm:
         """
         Wrapper to handle gripper preservation.
         """
-        angles[0] = angles[0]  + (-6)
         if not update_gripper:
             # Use current gripper angle
             current_gripper = self.current_angles[5] if len(

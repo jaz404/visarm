@@ -19,8 +19,8 @@ joint_limits_deg = [(-80, 90), (-80, 80),
 joint_limits_rad = [(np.radians(lo), np.radians(hi))
                     for (lo, hi) in joint_limits_deg]
 HOME = [0.0, 0.0, 0.0, 0.0, 0.0]
-POS_1 = [0, 29, 77, 90, -10]
-POS_2 = [0, 0, 45, 65, -10]
+POS_1 = [-6, 29, 77, 90, -10]
+POS_2 = [-6, 0, 45, 65, -10]
 
 GRIPPER_OPEN = 0
 GRIPPER_CLOSE = 32.0
