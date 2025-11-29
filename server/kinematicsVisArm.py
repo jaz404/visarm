@@ -225,11 +225,6 @@ class KinematicsVisArm:
 
                     geom_angles = [t1, t2, t3, t4, 0.0]
 
-                    # Apply offset (Error correction, gripper angle, etc.)
-                    for i in range(len(geom_angles)):
-                        geom_angles[i] += offset[i]
-                        geom_angles[i] = self._wrap_angle(geom_angles[i])
-
                     if debug:
                         print(
                             f"Geom Angles (rad): {geom_angles}, (deg): {np.degrees(geom_angles)}")
@@ -262,6 +257,13 @@ class KinematicsVisArm:
         # 2. Among valid solutions, prefer low cost (comfortable angles)
         solutions.sort(key=lambda x: (
             x[1] > 0.1, x[2] if x[1] <= 0.1 else x[1]))
+        
+        # # Add offset
+        # for i in range(len(solutions)):
+        #     angles = solutions[i][0]
+        #     angles_offset = [angles[j] + offset[j] for j in range(len(angles))]
+        #     solutions[i][0] = angles_offset
+
         print(f"Total IK solutions found: {len(solutions)}")
 
         # Return only [angles, err] to maintain compatibility

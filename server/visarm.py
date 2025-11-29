@@ -299,7 +299,7 @@ class VisArm:
         corrected_path = np.round(np.array(corrected_path), 3)
         return np.array(corrected_path[1:])
 
-    def move_to_position(self, target_pos, steps=6, order=None):
+    def move_to_position(self, target_pos, steps=6, order=None, offset=None):
         self.set_home()  # Move to a safe position before pathing
         time.sleep(2)
 
@@ -321,6 +321,9 @@ class VisArm:
                     f"[VisArm] Moving to point {point} with angles {np.degrees(best_angles)} and error {best_err}")
 
                 # Use move_to_angles to preserve gripper state
+                if offset:
+                    best_angles = [best_angles[i] + offset[i] for i in range(len(best_angles))]
+                    
                 success = self.move_to_angles(
                     np.degrees(best_angles), update_gripper=False)
 

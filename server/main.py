@@ -145,9 +145,13 @@ def main():
             target_pos = np.array(
                 [P_robot_cm[0], P_robot_cm[1], P_robot_cm[2]])
 
+            if target_pos[1] < 0:
+                offset = [-6, 0, 0, 0, 0]
+            else:
+                offset = [0, 0, 0, 0, 0]
             print(f"[SORTING] Moving to object {color}...")
             # Move to object (Open)
-            visarm.move_to_position(target_pos, steps=2)
+            visarm.move_to_position(target_pos, steps=2, add_offset=offset)
             time.sleep(1)
 
             # Close Gripper
