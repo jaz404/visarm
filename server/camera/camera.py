@@ -2,20 +2,22 @@ import pyrealsense2 as rs
 import numpy as np
 import json
 import cv2
+import os
 
-from camera_model import compute_camera_pose, pixel_to_robot
+from .camera_model import compute_camera_pose, pixel_to_robot
 
 
 class Camera:
     def __init__(self, param_file="camera_params.json",
                  resolution=(640, 480), fps=30):
-        
-        self.param_file = param_file 
+
+        # keep the path string so save_board_outline_to_json can write to it
+        self.param_file = param_file
 
         with open(param_file) as f:
             params = json.load(f)
 
-        self.params = params 
+        self.params = params
         self.K = np.array(params["intrinsics"]["K"], dtype=np.float32)
 
         radial = params["intrinsics"]["radial"]
@@ -52,7 +54,6 @@ class Camera:
 
         def get_frame_for_pose():
             return self.get_frame_raw()
-        
 
         R, t, pose, corners, undist = compute_camera_pose(
             get_raw_image_fn=get_frame_for_pose,
@@ -81,13 +82,12 @@ class Camera:
         if raw is None:
             return None
         return cv2.undistort(raw, self.K, self.dist)
-    
+
     def get_frame(self):
         return self.get_frame_raw()
 
     def pixel_to_robot(self, u, v):
         return pixel_to_robot(u, v, self.K, self.R, self.t, self.T_O_from_checker)
-    
 
     def _compute_full_board_outline(self, corners):
         w, h = self.pattern_size
@@ -114,12 +114,14 @@ class Camera:
     def shutdown(self):
         self.pipeline.stop()
 
+
 def click_handler(event, x, y, flags, param):
     cam, frame_ref = param
     if event == cv2.EVENT_LBUTTONDOWN:
         P = cam.pixel_to_robot(x, y)
         print("Pixel:", (x, y), "→ Robot:", P)
         cv2.circle(frame_ref[0], (x, y), 6, (0, 0, 255), -1)
+
 
 def main():
     cam = Camera("camera_params.json")
@@ -138,6 +140,7 @@ def main():
 
     cam.shutdown()
     cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     main()

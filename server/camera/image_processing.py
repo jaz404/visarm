@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
-from camera import Camera
-from image_processing import ImageProcessing
+from .camera import Camera
+
 
 class ImageProcessing:
     def __init__(self, K, dist, outline_px):
@@ -35,7 +35,7 @@ class ImageProcessing:
 
         # apply board mask
         mask = np.zeros(f.shape[:2], dtype=np.uint8)
-        cv2.fillPoly(mask, [self.outline.reshape((-1,1,2))], 255)
+        cv2.fillPoly(mask, [self.outline.reshape((-1, 1, 2))], 255)
         f_masked = cv2.bitwise_and(f, f, mask=mask)
 
         # extract green centers
@@ -44,9 +44,9 @@ class ImageProcessing:
         # visualize
         vis = f_masked.copy()
         for (cx, cy) in centers:
-            cv2.circle(vis, (cx, cy), 8, (0,200,0), -1)
+            cv2.circle(vis, (cx, cy), 8, (0, 200, 0), -1)
             cv2.putText(vis, f"{cx},{cy}", (cx+5, cy-5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,200,0), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 0), 2)
 
         # draw outline on final result
         vis = self.draw_outline(vis)
@@ -60,10 +60,12 @@ class ImageProcessing:
 
         # Clean mask
         mask = cv2.medianBlur(mask, 5)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN,
+                                np.ones((5, 5), np.uint8))
 
         # Find contours
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         if len(contours) == 0:
             return [], mask
@@ -86,6 +88,7 @@ class ImageProcessing:
         cy = int(M["m01"] / M["m00"])
 
         return [(cx, cy)], mask
+
 
 def main():
     cam = Camera("camera_params.json")
@@ -114,6 +117,7 @@ def main():
 
     cam.shutdown()
     cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     main()

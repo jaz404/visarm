@@ -4,6 +4,7 @@ import glob
 import sys
 import numpy as np
 import sympy as sp
+from scipy.interpolate import CubicSpline
 from kinematicsVisArm import KinematicsVisArm
 import variables as v
 
@@ -12,7 +13,8 @@ class VisArm:
     def __init__(self):
         self.serial_port = None
         self.ser = None
-        self.current_angles = [0.0] * 5
+        # Track all 6 joints including gripper
+        self.current_angles = [0.0] * 6
 
         self.kinematics = KinematicsVisArm(
             ll=v.ll,
@@ -140,8 +142,8 @@ class VisArm:
         parts = resp.split()
         try:
             angles = [float(x) for x in parts[1:]]
-            if len(angles) >= 5:
-                self.current_angles = angles[:5]
+            if len(angles) >= 6:
+                self.current_angles = angles[:6]
         except ValueError:
             pass
 
@@ -154,39 +156,100 @@ class VisArm:
             clamped[i] = max(limits[i][0], min(clamped[i], limits[i][1]))
         return clamped
 
-    def set_joint_angles(self, angles):
-        if len(angles) < 5:
-            print("[VisArm] set_joint_angles requires at least 5 angles")
+    def set_joint_angles(self, angles, order=None):
+        # Expect 6 angles including gripper
+        if len(angles) < 6:
+            print("[VisArm] set_joint_angles requires 6 angles (including gripper)")
             return False
 
         mod_angles = self.clamp_joint_angles(angles)
 
-        cmd_parts = ["SET"]
-        for a in mod_angles[:6]:
-            cmd_parts.append(str(int(round(a))))
-        cmd_parts.append("0")
+        # Ensure we have exactly 6 angles
+        target_angles = mod_angles[:6]
+        while len(target_angles) < 6:
+            target_angles.append(0)
 
-        cmd = " ".join(cmd_parts)
-        resp = self.send_command(cmd)
+        # Move in a safe order; gripper last
+        current_temp = list(self.current_angles)
+        if order is not None:
+            for idx in order:
+                if idx >= len(target_angles):
+                    continue
 
-        if "ERR" in resp:
-            print("[VisArm] Error reported.")
-            return False
-        if "READY" in resp or "OK" in resp:
-            print(f"[VisArm] Motion complete ({resp}).")
-            return True
+                target_val = target_angles[idx]
+                current_val = current_temp[idx]
 
-        return False
+                if abs(target_val - current_val) > 1.0:  # Threshold
+                    print(
+                        f"[VisArm] Moving joint {idx+1} from {current_val} to {target_val}")
+                    # Update just this joint in our temp state
+                    current_temp[idx] = target_val
+
+                    # Send command for this intermediate state (6 angles)
+                    cmd_parts = ["SET"]
+                    for a in current_temp:
+                        cmd_parts.append(str(int(round(a))))
+                    # Optional duration/speed token (ignored by client)
+                    cmd_parts.append("0")
+
+                    cmd = " ".join(cmd_parts)
+                    resp = self.send_command(cmd)
+                    if "ERR" in resp:
+                        print(f"[VisArm] Error moving joint {idx+1}")
+                        return False
+        else:
+            # Single command for all joints
+            cmd_parts = ["SET"]
+            for a in target_angles:
+                cmd_parts.append(str(int(round(a))))
+            # Optional duration/speed token (ignored by client)
+            cmd_parts.append("0")
+
+            cmd = " ".join(cmd_parts)
+            resp = self.send_command(cmd)
+            if "ERR" in resp:
+                print(f"[VisArm] Error setting joint angles")
+                return False
+
+        # Update internal state
+        self.current_angles = target_angles
+        return True
+
+    def move_to_angles(self, angles, update_gripper=False, order=None):
+        """
+        Wrapper to handle gripper preservation.
+        """
+        if not update_gripper:
+            # Use current gripper angle
+            current_gripper = self.current_angles[5] if len(
+                self.current_angles) >= 6 else 0
+            # Make a copy and update the 5th element
+            angles = list(angles)
+            if len(angles) < 6:
+                # pad to 6 and set gripper
+                while len(angles) < 5:
+                    angles.append(0)
+                angles.append(current_gripper)
+            else:
+                angles[5] = current_gripper
+
+        return self.set_joint_angles(angles, order=order)
 
     def set_home(self):
-        return self.set_joint_angles([0,0,0,0,0,0])
-    
+        # Reverse order: 1,2,3,0,4 (skip gripper)
+        return self.move_to_angles(v.HOME, update_gripper=False, order=[1, 2, 3, 0, 4])
 
     def set_survey(self):
-        return self.set_joint_angles([-6, 29,77, 90, -10])
+        # Reverse order: 1,2,3,0,4 (skip gripper)
+        return self.move_to_angles(v.POS_1, update_gripper=False, order=[1, 2, 3, 0, 4])
+
+    def set_pos_2(self):
+        # Reverse order: 1,2,3,0,4 (skip gripper)
+        return self.move_to_angles(v.POS_2, update_gripper=False, order=[1, 2, 3, 0, 4])
 
     def fkine(self, q):
-        return self.kinematics.forward_kinematics(q)
+        # Kinematics are defined for arm joints (exclude gripper)
+        return self.kinematics.forward_kinematics(q[:5])
 
     def get_eMc(self):
         t = np.eye(4)
@@ -208,40 +271,115 @@ class VisArm:
     def inv_kinematics(self, target_pos):
         return self.kinematics.ik(target_pos)
 
+    def spline_path(self, start_pos, end_pos, num_points=6, height=18.0):
+        start_pos = np.array(start_pos, dtype=float)
+        end_pos = np.array(end_pos, dtype=float)
+
+        t = np.linspace(0, 1, num_points)
+
+        x = (1 - t) * start_pos[0] + t * end_pos[0]
+        y = (1 - t) * start_pos[1] + t * end_pos[1]
+
+        z_apex = height
+        z_control_t = np.array([0, 0.5, 1.0], dtype=float)
+        z_control_z = np.array([start_pos[2], z_apex, end_pos[2]], dtype=float)
+
+        cs = CubicSpline(z_control_t, z_control_z, bc_type='natural')
+        z = cs(t)
+
+        path = np.column_stack((x, y, z))
+
+        # --- Workspace enforcement ---
+        corrected_path = []
+        for p in path:
+            if self.kinematics.pos_within_workspace(p):
+                corrected_path.append(p)
+            else:
+                corrected_path.append(self.kinematics.clamp_to_workspace(p))
+        corrected_path = np.round(np.array(corrected_path), 3)
+        return np.array(corrected_path[1:])
+
+    def move_to_position(self, target_pos, steps=6, order=None):
+        self.set_home()  # Move to a safe position before pathing
+        time.sleep(2)
+
+        if order is not None:
+            self.order = order
+
+        curr_pos = self.fkine(self.get_joint_angles())
+        print(f"[VisArm] Moving from {curr_pos} to {target_pos}")
+        path_points = self.spline_path(
+            curr_pos, target_pos, num_points=int(steps))
+
+        for point in path_points:
+            ik_solutions = self.inv_kinematics(point)
+            if ik_solutions:
+                # IK solutions are now sorted by "comfort" (cost) then error
+                # So we just pick the first one
+                best_angles, best_err = ik_solutions[0]
+                print(
+                    f"[VisArm] Moving to point {point} with angles {np.degrees(best_angles)} and error {best_err}")
+
+                # Use move_to_angles to preserve gripper state
+                success = self.move_to_angles(
+                    np.degrees(best_angles), update_gripper=False)
+
+                if not success:
+                    print("[VisArm] Failed to move to point.")
+                    return False
+                time.sleep(0.5)  # Small delay between moves
+            else:
+                print(
+                    f"[VisArm] No IK solution found for point {point}. Aborting path.")
+                return False
+        return True
+
+    def close_gripper(self):
+        curr_angles = self.get_joint_angles()
+        print(f"[VisArm] close_gripper: Current angles: {curr_angles}")
+        new_angles = list(curr_angles)
+        if len(new_angles) < 6:
+            while len(new_angles) < 6:
+                new_angles.append(0)
+        new_angles[5] = v.GRIPPER_CLOSE
+        self.set_joint_angles(new_angles)
+
+    def open_gripper(self):
+        curr_angles = self.get_joint_angles()
+        print(f"[VisArm] open_gripper: Current angles: {curr_angles}")
+        new_angles = list(curr_angles)
+        if len(new_angles) < 6:
+            while len(new_angles) < 6:
+                new_angles.append(0)
+        new_angles[5] = v.GRIPPER_OPEN
+        self.set_joint_angles(new_angles)
+
 
 def main():
     visarm = VisArm()
     if not visarm.connect():
         return
     # set to survey position
-    visarm.set_joint_angles([-6, 29,77, 90, -10])
+    # visarm.set_survey()
+    # time.sleep(2)
 
-    # print("[VisArm] Current joint angles:", visarm.get_joint_angles())
-    # print("[VisArm] Moving to home position...")
-    # if visarm.set_home():
-    #     angles = visarm.get_joint_angles()
-    #     print("[VisArm] Moved to home position. Current angles:", angles)
-    #     if angles == [-2.0, 0.0, 53.0, 90.0, 0.0]:
-    #         print("[VisArm] Home position reached.")
-    #     else:
-    #         print("[VisArm] Home position not reached accurately.")
-    # else:
-    #     print("[VisArm] Failed to move to home position.")
+    # keys = v.BINS.keys()
+    # for key in keys:
+    #     print(f"\n[TEST] Moving to bin: {key}")
+    #     bin_params = v.BINS[key]
+    #     pos = [bin_params[0], bin_params[1], bin_params[2]]
+    #     visarm.set_survey()
+    #     time.sleep(2)
+    #     visarm.move_to_position(pos, steps=2)
+    #     time.sleep(10)
 
-    # pos3 = np.array([30.5, 11.7, 5])
-    # print(f"[VisArm] Computing IK for target position: {pos3}")
-    # ik_solution = visarm.inv_kinematics(pos3)
-    # if ik_solution:
-    #     best_angles, best_err = min(ik_solution, key=lambda x: x[1])
-    #     print(np.round(np.degrees(best_angles), 3),
-    #           f"with pos error: {best_err:.4f} cm")
-    #     print("[VisArm] Moving to IK solution...")
-    #     if visarm.set_joint_angles(np.degrees(best_angles)):
-    #         print("[VisArm] Move successful.")
-    # else:
-    #     print("[VisArm] No IK solution found.")
-    # time.sleep(20)
-    # visarm.set_joint_angles([0, 0, 0, 0, 0])
+    visarm.close_gripper()
+    time.sleep(2)
+    visarm.open_gripper()
+
+    # visarm.move_to_position(pos, steps=2)
+    # time.sleep(10)
+    visarm.set_home()
 
     visarm.disconnect()
 

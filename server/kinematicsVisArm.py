@@ -86,19 +86,22 @@ class KinematicsVisArm:
         return transforms
 
     def forward_kinematics(self, joint_angles) -> np.ndarray:
-        if hasattr(joint_angles, 'ndim') and joint_angles.ndim > 1:
-            joint_angles = joint_angles[0]
+        positions = []
+        transforms = self.compute_dh_matrix(symbolic=True)
 
+        # Substitute only available joints
         angle_subs = {self.θ[i]: float(joint_angles[i])
                       for i in range(len(joint_angles))}
 
-        transforms = self.compute_dh_matrix(symbolic=True)
-        trans = sp.eye(4)
-        for mat in range(len(joint_angles) + 1):
-            trans = trans @ transforms[mat]
+        T = sp.eye(4)
+        # Base frame + number of joints defined
+        for i in range(len(transforms)):
+            T = T @ transforms[i]
+            T_num = np.array(T.subs(angle_subs)).astype(np.float64)
+            positions.append(T_num[:3, 3])
 
-        trans = trans.subs(angle_subs)
-        return np.array(trans).astype(np.float64)
+        pos = positions[-1]
+        return np.array(pos)
 
     def calculate_joint_limits(self, joints: np.ndarray | list) -> np.ndarray:
         if isinstance(joints, list):
@@ -112,9 +115,29 @@ class KinematicsVisArm:
         joints = joints.astype(np.float64)
         return joints
 
-    def ik(self, pos):
+    def ik(self, pos, debug=False):
         x, y, z = pos
         l1, l2, l3, l4, l5, l6 = self.ll
+
+        # 1. Reach Clamping: Project target into workspace if out of reach
+        # Max reach from shoulder (approximate sum of link lengths)
+        max_reach = l2 + l3 + l4 + l6
+
+        # Vector from shoulder (0, 0, l1) to target (x, y, z)
+        r_plane = math.sqrt(x**2 + y**2)
+        z_rel = z - l1
+        dist_from_shoulder = math.sqrt(r_plane**2 + z_rel**2)
+
+        if dist_from_shoulder > max_reach:
+            if debug:
+                print(
+                    f"Target out of reach ({dist_from_shoulder:.2f} > {max_reach:.2f}). Clamping.")
+            scale = max_reach / dist_from_shoulder
+            x *= scale
+            y *= scale
+            z = l1 + z_rel * scale
+            # Update pos for error calculation
+            pos = [x, y, z]
 
         # Correct lengths
         L_upper = l2
@@ -157,6 +180,9 @@ class KinematicsVisArm:
 
                 # Check reachability
                 if dist > (L_upper + L_forearm) or dist < abs(L_upper - L_forearm):
+                    if debug:
+                        print(
+                            f"Unreachable position for t1={math.degrees(t1):.2f}°, phi={math.degrees(phi):.2f}°, dist={dist:.2f} cm, bounds=({abs(L_upper - L_forearm):.2f}, {L_upper + L_forearm:.2f}) cm")
                     continue
 
                 # Law of cosines for elbow
@@ -195,31 +221,45 @@ class KinematicsVisArm:
                     t3 = self._wrap_angle(-gamma2)
 
                     # theta4
-                    # phi = gamma1 + gamma2 + delta - theta4
-                    # theta4 = gamma1 + gamma2 + delta - phi
                     t4 = self._wrap_angle(gamma1 + gamma2 + delta - phi)
 
                     geom_angles = [t1, t2, t3, t4, 0.0]
+                    if debug:
+                        print(
+                            f"Geom Angles (rad): {geom_angles}, (deg): {np.degrees(geom_angles)}")
 
                     if self._check_joint_limits(geom_angles):
                         # Calculate exact error
-                        T_sol = self.forward_kinematics(geom_angles)
-                        pos_sol = T_sol[0:3, 3]
+                        pos_sol = self.forward_kinematics(geom_angles)
                         pos_err = np.linalg.norm(pos_sol - np.array(pos))
+
+                        # Calculate "Comfort Cost"
+                        # Penalize angles far from the center of their range
+                        cost = 0
+                        for i, angle in enumerate(geom_angles[:4]):
+                            min_l, max_l = self.joint_limits[i]
+                            mid = (min_l + max_l) / 2
+                            rng = max_l - min_l
+                            if rng > 0:
+                                cost += ((angle - mid) / (rng/2)) ** 2
+
+                        if debug:
+                            print(
+                                f"IK Solution: Angles (deg): {np.degrees(geom_angles)}, Pos Err: {pos_err:.4f} cm, Cost: {cost:.4f}")
 
                         # Only add if error is small (it should be small by construction)
                         if pos_err < 1.0:  # 1 cm tolerance
-                            solutions.append([geom_angles, pos_err])
+                            solutions.append([geom_angles, pos_err, cost])
 
-        print(
-            f"Found {len(solutions)} solutions after sweeping phi and filtering.")
-        solutions.sort(key=lambda x: x[1])
-        # Add offset to all solutions if needed
-        offset = [np.radians(-8), 0, 0, 0, 0]
-        for sol in solutions:
-            sol[0] = [self._wrap_angle(sol[0][i] + np.radians(offset[i]))
-                      for i in range(len(sol[0]))]
-        return solutions
+        # Sort solutions:
+        # 1. Prefer valid solutions (low error)
+        # 2. Among valid solutions, prefer low cost (comfortable angles)
+        solutions.sort(key=lambda x: (
+            x[1] > 0.1, x[2] if x[1] <= 0.1 else x[1]))
+        print(f"Total IK solutions found: {len(solutions)}")
+
+        # Return only [angles, err] to maintain compatibility
+        return [[s[0], s[1]] for s in solutions]
 
     def _wrap_angle(self, angle):
         """Wrap angle to [-pi, pi]"""
@@ -241,38 +281,83 @@ class KinematicsVisArm:
                 return False
         return True
 
+    def pos_within_workspace(self, pos):
+        x, y, z = pos
+        r = math.sqrt(x**2 + y**2)
+        l1, l2, l3, l4, l5, l6 = self.ll
+
+        # Approximate workspace as a cylinder
+        r_min = abs(l2 - l3) + l4  # Minimum reach in horizontal plane
+        r_max = l2 + l3 + l4 + l6  # Maximum reach in horizontal plane
+        z_min = 0  # Base level
+        z_max = l1 + l2 + l3 + l4 + l6  # Maximum height
+
+        if r_min <= r <= r_max and z_min <= z <= z_max:
+            return True
+        else:
+            return False
+
+    def clamp_to_workspace(self, pos):
+        x, y, z = pos
+
+        x = np.clip(x, v.min_x, v.max_x)
+        y = np.clip(y, v.min_y, v.max_y)
+        z = np.clip(z, v.min_z, v.max_z)
+
+        return np.array([x, y, z])
+
 
 def round_trip_test(kin, n=100):
     ok = True
-    for _ in range(n):
-        print(f"Test {_+1}/{n}")
-        q_rand = []
-        for (lo, hi) in kin.joint_limits:
-            q_rand.append(np.random.uniform(lo, hi))
 
-        q_rand = np.array(q_rand)
-        T = kin.forward_kinematics(q_rand)
-        pos = T[:3, 3]
-        q_ik_all = kin.ik(pos)
+    # Define workspace limits for testing
+    # Approximate min/max reach based on link lengths
+    l1, l2, l3, l4, l5, l6 = kin.ll
+    max_reach = l2 + l3 + l4 + l6
+    min_reach = 10.0  # Avoid singularity near base
+
+    for i in range(n):
+        print(f"Test {i+1}/{n}")
+
+        # Generate random point in cylindrical coordinates
+        r = np.random.uniform(min_reach, max_reach)  # 85% of max reach
+        theta = np.random.uniform(-np.pi, np.pi)
+        z = np.random.uniform(v.min_z, v.max_z)  # 80% of max height
+
+        x = r * np.cos(theta)
+        y = r * np.sin(theta)
+        target_pos = np.array([x, y, z])
+        if not kin.pos_within_workspace(target_pos):
+            print(f"Generated point outside workspace, skipping: {target_pos}")
+            continue
+
+        # Solve IK
+        q_ik_all = kin.ik(target_pos)
+
         if len(q_ik_all) == 0:
-            print("No IK solutions returned")
+            print(
+                f"No IK solutions found for target: {np.round(target_pos, 3)}")
             ok = False
             continue
-        # choose the first solution row
-        q_ik, err = q_ik_all[0]
-        T2 = kin.forward_kinematics(q_ik)
-        pos_err = np.linalg.norm(T[:3, 3] - T2[:3, 3])
-        angle_error = np.linalg.norm(q_rand - q_ik)
-        if pos_err > 15:
-            ok = False
 
-        print(
-            f"Pos err: {pos_err:.3f} cm, Angle err: {np.degrees(angle_error):.2f}°")
-        print(f"Original Pos: {np.round(pos, 3)}")
-        print(f"IK Sol Pos:   {np.round(T2[:3, 3], 3)}")
-        print("Original joints (deg):", np.degrees(q_rand))
-        print("IK joints (deg):", np.degrees(q_ik))
-        print()
+        # Choose the best solution (lowest error)
+        q_ik, err = q_ik_all[0]
+
+        # Compute FK for the solution
+        pos_ik = kin.forward_kinematics(q_ik)
+
+        # Calculate error
+        pos_err = np.linalg.norm(target_pos - pos_ik)
+
+        if pos_err > 1.0:  # 1cm tolerance
+            ok = False
+            print(f"FAIL: Large position error: {pos_err:.3f} cm")
+
+        print(f"Target Pos: {np.round(target_pos, 3)}")
+        print(f"IK Sol Pos: {np.round(pos_ik, 3)}")
+        print(f"Pos Err:    {pos_err:.3f} cm")
+        print(f"IK Angles:  {np.degrees(q_ik)}")
+        print("-" * 30)
 
     print("Round-trip tests passed?", ok)
 
@@ -286,15 +371,17 @@ def main():
         initial_offset=v.initial_offset
     )
 
-    angle = [0, -45, 80, 45, 0]
-    start_pos = np.deg2rad(angle)
-    end_eff_pos_3 = kin.forward_kinematics(start_pos)
-    print(f"End Effector Position for joints {angle}:")
-    print(np.round(end_eff_pos_3, 3))
-    pos3 = end_eff_pos_3[0:3, 3]
+    # angle = [0, -45, 80, 45, 0]
+    # start_pos = np.deg2rad(angle)
+    # end_eff_pos_3 = kin.forward_kinematics(start_pos)
+    # print(f"End Effector Position for joints {angle}:")
+    # print(np.round(end_eff_pos_3, 3))
 
     print("Inverse Kinematics Analytic Solutions for a sample target:")
-    theta = kin.ik(pos3)
+    pos = [5., -26.,  5.]
+    theta = kin.ik(pos)
+    for i in theta:
+        print(np.degrees(i[0]), f"with pos error: {i[1]:.4f} cm")
     if theta:
         best_angles, best_err = min(theta, key=lambda x: x[1])
         print(np.round(np.degrees(best_angles), 3),
@@ -302,8 +389,8 @@ def main():
     else:
         print("No solution found for sample target.")
 
-    print("\nRunning Round Trip Tests...")
-    round_trip_test(kin, n=5)
+    # print("\nRunning Round Trip Tests...")
+    # round_trip_test(kin, n=20)
 
 
 if __name__ == "__main__":

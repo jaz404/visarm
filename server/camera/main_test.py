@@ -9,12 +9,8 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from visarm import VisArm
+import variables as v
 
-# Dark Green HSV
-HSV_DARK_GREEN = {
-    "lower": np.array([30, 71, 0]),
-    "upper": np.array([54, 255, 110])
-}
 import select
 
 def user_input_available():
@@ -57,7 +53,7 @@ def main():
             continue
 
         # Process
-        processed, centers, mask = ip.process(raw, HSV_DARK_GREEN)
+        processed, centers, mask = ip.process(raw, v.HSV_DARK_GREEN)
 
         # Track latest detected center
         if len(centers) > 0:
