@@ -145,7 +145,7 @@ def main():
             target_pos = np.array(
                 [P_robot_cm[0], P_robot_cm[1], P_robot_cm[2]])
 
-            if target_pos[1] < 0:
+            if target_pos[1] < 6.7:
                 offset =  np.deg2rad([-6, 0, 0, 0, 0])
             else:
                 offset = [0, 0, 0, 0, 0]

@@ -23,7 +23,7 @@ POS_1 = [-6, 29, 77, 90, -10]
 POS_2 = [-6, 0, 45, 65, -10]
 
 GRIPPER_OPEN = 0
-GRIPPER_CLOSE = 32.0
+GRIPPER_CLOSE = 35.0
 
 HSV_DARK_GREEN = {
     "lower": np.array([30, 71, 0]),
