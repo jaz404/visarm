@@ -41,17 +41,17 @@ HSV_YELLOW = {
     "lower": np.array([16, 160, 115]),
     "upper": np.array([66, 255, 255])
 }
-HSV_COPPER = {
-    "lower": np.array([0, 105, 55]),
-    "upper": np.array([14, 255, 180])
-}
+# HSV_COPPER = {
+#     "lower": np.array([0, 105, 55]),
+#     "upper": np.array([14, 255, 180])
+# }
 
 BINS = {
     # "HSV_DARK_GREEN": np.array([0, 26.0, 4.0]),
     "HSV_BLUE": np.array([16.0, 26.0, 5.0]),
     "HSV_GREEN": [0, 26.0, 4.0],
     "HSV_YELLOW": [5.0, -26.0, 5.0],
-    "HSV_COPPER": [16.0, -26.0, 5.0],
+    # "HSV_COPPER": [16.0, -26.0, 5.0],
 }
 
 min_x, max_x = -37, 36
