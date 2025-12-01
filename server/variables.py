@@ -30,12 +30,12 @@ HSV_DARK_GREEN = {
     "upper": np.array([54, 255, 110])
 }
 HSV_BLUE = {
-    "lower": np.array([83, 184, 0]),
-    "upper": np.array([179, 255, 108])
+    "lower": np.array([95, 125, 0]),
+    "upper": np.array([179, 255, 110])
 }
 HSV_GREEN = {
-    "lower": np.array([46, 200, 0]),
-    "upper": np.array([95, 255, 255])
+    "lower": np.array([60, 125, 87]),
+    "upper": np.array([179, 255, 200])
 }
 HSV_YELLOW = {
     "lower": np.array([16, 160, 115]),

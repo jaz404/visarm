@@ -192,26 +192,38 @@ def main():
     ip = ImageProcessing(cam.K, cam.dist, cam.outline)
 
     HSV_BLUE = {
-        "lower": np.array([83, 184, 0]),
-        "upper": np.array([179, 255, 108])
+        "lower": np.array([95, 125, 0]),
+        "upper": np.array([179, 255, 110])
     }
+    HSV_GREEN = {
+        "lower": np.array([60, 125, 87]),
+        "upper": np.array([179, 255, 200])
+    }
+    HSV_YELLOW = {
+        "lower": np.array([16, 160, 115]),
+        "upper": np.array([66, 255, 255])
+    }
+
     print(cam.outline)
     while True:
         raw = cam.get_frame_raw()
 
-        processed, centers, color_mask = ip.process(raw, HSV_BLUE)
+        processed, centers, color_mask = ip.process(raw, HSV_YELLOW)
 
         # Show visual result
+        cv2.namedWindow("Processed", cv2.WINDOW_NORMAL)
         cv2.imshow("Processed", processed)
         cv2.imshow("Mask", color_mask)
-
         cv2.imshow("raw", raw)
 
-        if ip.is_object_picked(raw):
-            print("[SORTING] Cube detected in gripper.")
-        else:
-            print("[SORTING] No cube detected. Will retry offsets.")
-            continue   # retry next offset or next loop
+        # if ip.is_object_picked(raw):
+        #     print("[SORTING] Cube detected in gripper.")
+        # else:
+        #     print("[SORTING] No cube detected. Will retry offsets.")
+        #     continue   # retry next offset or next loop
+
+        if len(centers) > 0:
+            print(f"Detected centers: {centers}")
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break

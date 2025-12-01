@@ -161,7 +161,7 @@ def main():
             # Contour area thresholds to filter out large objects like a hand
             # and very small noise. Tune these if needed for your camera.
             MIN_CONTOUR_AREA = 5000
-            MAX_CONTOUR_AREA = 7000
+            MAX_CONTOUR_AREA = 9000
 
             # Iterate over all colors in BINS and detect contours in the mask.
             for color_name, bin_pos in v.BINS.items():
@@ -270,6 +270,39 @@ def main():
                 time.sleep(0.5)
 
                 # Move to POS_2 (Closed)
+                print("[SORTING] Moving to POS_2 (with object)...")
+                visarm.set_survey()
+                time.sleep(2)
+
+                latest_raw = None
+                for _ in range(3):
+                    with frame_store['lock']:
+                        if frame_store['raw'] is not None:
+                            latest_raw = frame_store['raw'].copy()
+                    if latest_raw is not None:
+                        break
+                    time.sleep(0.02)
+
+                if latest_raw is None:
+                    # Couldn’t get a frame; skip this object iteration gracefully
+                    print(
+                        "[SORTING] No frame available to verify pickup; skipping check.")
+                    continue
+
+                # Normalize to a plain Python bool to avoid numpy truthiness issues
+                picked_raw = ip.is_object_picked(latest_raw)
+                try:
+                    picked = bool(np.asarray(picked_raw).item())
+                except Exception:
+                    picked = bool(picked_raw)
+
+                if not picked:
+                    print(
+                        "[SORTING] Pickup verification: FAILED — opening gripper and retrying.")
+                    visarm.open_gripper()
+                    # Skip moving to bin for this object
+                    continue
+
                 print("[SORTING] Moving to Bin Position)...")
                 bin_pos = v.BINS[color]
                 visarm.move_to_position(bin_pos, steps=2)
