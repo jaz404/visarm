@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from .camera import Camera
+from camera import Camera
 
 
 class ImageProcessing:
@@ -89,6 +89,53 @@ class ImageProcessing:
 
         return [(cx, cy)], mask
 
+    def is_object_picked(self, frame):
+        # Ensure survey position before checking!
+        h, w = frame.shape[:2]
+        roi = frame[int(h*0.65):h, int(w*0.30):int(w*0.70)]
+        hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+        h, s, v = cv2.split(hsv)
+
+        # Strong saturation mask
+        mask = cv2.inRange(s, 70, 255)
+
+        # Slight blur
+        mask = cv2.medianBlur(mask, 7)
+
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        if not contours:
+            return False
+
+        # Keep ONLY the largest contour
+        cnt = max(contours, key=cv2.contourArea)
+        area = cv2.contourArea(cnt)
+
+        # Must be large enough (>1500 px)
+        if area < 1500:
+            return False
+
+        # Bounding box
+        x, y, w, h = cv2.boundingRect(cnt)
+
+        # Must be near the bottom of the ROI (cube is close to camera)
+        roi_h = roi.shape[0]
+        if y + h < roi_h * 0.55:   # not low enough
+            return False
+
+        # Must be roughly square-ish or tall-ish (cube face)
+        ratio = w / float(h)
+        if ratio < 0.4 or ratio > 2.5:
+            return False
+
+        # Must be centered horizontally (within 30-40% from center)
+        roi_w = roi.shape[1]
+        center_x = x + w/2
+        if center_x < roi_w * 0.20 or center_x > roi_w * 0.80:
+            return False
+
+        return True
+
 
 def main():
     cam = Camera("camera_params.json")
@@ -102,15 +149,24 @@ def main():
     while True:
         raw = cam.get_frame_raw()
 
-        processed, centers, color_mask = ip.process(raw, HSV_DARK_GREEN)
+        # processed, centers, color_mask = ip.process(raw, HSV_DARK_GREEN)
 
         # Show visual result
-        cv2.imshow("Processed", processed)
-        cv2.imshow("Mask", color_mask)
+        # cv2.imshow("Processed", processed)
+        # cv2.imshow("Mask", color_mask)
+
+        cv2.imshow("raw", raw)
+
 
         # Print centers live
-        if len(centers) > 0:
-            print("Detected centers:", centers)
+        # if len(centers) > 0:
+        #     print("Detected centers:", centers)
+
+        if ip.is_object_picked(raw):
+            print("[SORTING] Cube detected in gripper.")
+        else:
+            print("[SORTING] No cube detected. Will retry offsets.")
+            continue   # retry next offset or next loop
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
