@@ -362,9 +362,10 @@ def main():
     visarm = VisArm()
     if not visarm.connect():
         return
+    
     # set to survey position
-    # visarm.set_survey()
-    # time.sleep(2)
+    visarm.set_survey()
+    time.sleep(2)
 
     # keys = v.BINS.keys()
     # for key in keys:
@@ -379,6 +380,11 @@ def main():
     visarm.close_gripper()
     time.sleep(2)
     visarm.open_gripper()
+    while True:
+        try:
+            pass
+        except KeyboardInterrupt:
+            break
 
     # visarm.move_to_position(pos, steps=2)
     # time.sleep(10)

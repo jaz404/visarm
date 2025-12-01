@@ -38,7 +38,7 @@ class ImageProcessing:
         cv2.fillPoly(mask, [self.outline.reshape((-1, 1, 2))], 255)
         f_masked = cv2.bitwise_and(f, f, mask=mask)
 
-        # extract green centers
+        # extract centers
         centers, color_mask = self.extract_color_centers(f_masked, hsv_range)
 
         # visualize
@@ -69,25 +69,36 @@ class ImageProcessing:
 
         if len(contours) == 0:
             return [], mask
+        
+        if contours:
+            cnt = max(contours, key=cv2.contourArea)
+            (cx, cy), r = cv2.minEnclosingCircle(cnt)
+            cx, cy = int(cx), int(cy)
 
-        # Choose the STRONGEST detection = largest area contour
-        contours = sorted(contours, key=cv2.contourArea, reverse=True)
-        cnt = contours[0]          # strongest one
-        area = cv2.contourArea(cnt)
+        centers = []
+        # Minimum area to consider a valid detection (in px)
+        MIN_AREA_PX = 150
 
-        # Reject micro-noise
-        if area < 400:   # tune this
-            return [], mask
+        # for cnt in contours:
+        #     area = cv2.contourArea(cnt)
+        #     if area < MIN_AREA_PX:
+        #         continue
+        #     M = cv2.moments(cnt)
+        #     if M.get('m00', 0) == 0:
+        #         continue
+        #     cx = int(M['m10'] / M['m00'])
+        #     cy = int(M['m01'] / M['m00'])
+        #     centers.append((cx, cy))
 
-        # Compute centroid
-        M = cv2.moments(cnt)
-        if M["m00"] == 0:
-            return [], mask
+        for cnt in contours:
+            if cv2.contourArea(cnt) < MIN_AREA_PX:
+                continue
 
-        cx = int(M["m10"] / M["m00"])
-        cy = int(M["m01"] / M["m00"])
+            (cx, cy), radius = cv2.minEnclosingCircle(cnt)
+            cx, cy = int(cx), int(cy)
+            centers.append((cx, cy))
 
-        return [(cx, cy)], mask
+        return centers, mask
 
 
 def main():
