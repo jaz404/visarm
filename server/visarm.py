@@ -233,6 +233,8 @@ class VisArm:
             else:
                 angles[5] = current_gripper
 
+        angles[4] = -10  # fix joint 5 to -10 degrees
+
         return self.set_joint_angles(angles, order=order)
 
     def set_home(self):
@@ -322,8 +324,9 @@ class VisArm:
 
                 # Use move_to_angles to preserve gripper state
                 if add_offset is not None:
-                    best_angles = [best_angles[i] + add_offset[i] for i in range(len(best_angles))]
-                    
+                    best_angles = [best_angles[i] + add_offset[i]
+                                   for i in range(len(best_angles))]
+
                 success = self.move_to_angles(
                     np.degrees(best_angles), update_gripper=False)
 
@@ -362,10 +365,11 @@ def main():
     visarm = VisArm()
     if not visarm.connect():
         return
-    
+
     # set to survey position
     visarm.set_survey()
-    time.sleep(2)
+    # time.sleep(10)
+    # visarm.set_pos_2()
 
     # keys = v.BINS.keys()
     # for key in keys:
@@ -377,9 +381,9 @@ def main():
     #     visarm.move_to_position(pos, steps=2)
     #     time.sleep(10)
 
-    visarm.close_gripper()
-    time.sleep(2)
-    visarm.open_gripper()
+    # visarm.close_gripper()
+    # time.sleep(2)
+    # visarm.open_gripper()
     while True:
         try:
             pass

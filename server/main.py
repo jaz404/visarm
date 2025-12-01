@@ -63,29 +63,59 @@ def main():
         except cv2.error:
             pass
 
+        last_frame = None
+        last_proc = None
+
         while not store['stop']:
-            frame = cam.get_frame_raw()
+            # Always attempt to grab a frame from the camera first so capture
+            # happens regardless of any locking or display work.
+            try:
+                frame = cam.get_frame_raw()
+            except Exception:
+                frame = None
+
             if frame is None:
-                time.sleep(0.01)
+                # small sleep to avoid busy-looping when camera not ready
+                time.sleep(0.005)
                 continue
 
-            with store['lock']:
-                store['raw'] = frame.copy()
-                # Use processed frame if available, otherwise show raw
-                proc = store.get('processed')
+            # keep a local copy so display can work even if lock is busy
+            last_frame = frame.copy()
 
-            # Display windows outside the lock
+            # Try to update shared raw frame without blocking for long
+            acquired = store['lock'].acquire(blocking=False)
+            if acquired:
+                try:
+                    store['raw'] = last_frame.copy()
+                    # fetch processed overlay if available
+                    last_proc = store.get('processed')
+                finally:
+                    store['lock'].release()
+            else:
+                # If lock busy, avoid blocking; we'll still display latest_local
+                try:
+                    # attempt a quick read of processed overlay
+                    if store['lock'].acquire(blocking=False):
+                        try:
+                            last_proc = store.get('processed')
+                        finally:
+                            store['lock'].release()
+                except Exception:
+                    last_proc = None
+
+            # Display windows using local copies
             try:
-                if proc is not None:
-                    cv2.imshow("Processed View", proc)
+                if last_proc is not None:
+                    cv2.imshow("Processed View", last_proc)
                 else:
-                    cv2.imshow("Processed View", frame)
-                cv2.imshow("Raw feed", frame)
+                    cv2.imshow("Processed View", last_frame)
+                cv2.imshow("Raw feed", last_frame)
                 key = cv2.waitKey(1) & 0xFF
                 if key == ord('q'):
                     store['stop'] = True
                     break
             except cv2.error:
+                # ignore display errors but keep capturing frames
                 pass
 
         # Cleanup windows when exiting thread

@@ -36,6 +36,13 @@ class ArmVisualizer:
         """Initialize a simplified 2-DOF arm visualizer (first two joints only)."""
         self.kin = vis.kinematics
         self.joint_angles = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
+        # Track gripper separately so we always send 6 angles to the robot
+        try:
+            current = vis.get_joint_angles()
+            self.gripper_angle = float(
+                current[5]) if len(current) >= 6 else 0.0
+        except Exception:
+            self.gripper_angle = 0.0
 
         # Target point
         self.target_point = None
@@ -88,7 +95,7 @@ class ArmVisualizer:
         self.sliders = []
         for i in range(len(self.joint_angles)):
             ax_slider = plt.axes([
-                slider_left, 0.75 - i*0.12, slider_width, slider_height
+                slider_left, 0.75 - i*0.08, slider_width, slider_height
             ])
             lo, hi = v.joint_limits_deg[i]
             label = f"J{i+1} [{lo}°, {hi}°]"
@@ -99,6 +106,23 @@ class ArmVisualizer:
             slider.on_changed(
                 lambda val, idx=i: self.on_slider_change(idx, val))
             self.sliders.append(slider)
+
+        # Place control buttons above the Reset button (which is at y=0.08)
+        ax_pos1 = plt.axes([slider_left, 0.28, slider_width, 0.04])
+        self.btn_pos1 = Button(ax_pos1, 'Move to POS_1')
+        self.btn_pos1.on_clicked(self.move_to_pos1)
+
+        ax_pos2 = plt.axes([slider_left, 0.23, slider_width, 0.04])
+        self.btn_pos2 = Button(ax_pos2, 'Move to POS_2')
+        self.btn_pos2.on_clicked(self.move_to_pos2)
+
+        ax_open = plt.axes([slider_left, 0.18, slider_width, 0.04])
+        self.btn_open = Button(ax_open, 'Open Gripper')
+        self.btn_open.on_clicked(self.open_gripper)
+
+        ax_close = plt.axes([slider_left, 0.13, slider_width, 0.04])
+        self.btn_close = Button(ax_close, 'Close Gripper')
+        self.btn_close.on_clicked(self.close_gripper)
 
         # Add reset button
         ax_reset = plt.axes([slider_left, 0.08, slider_width, 0.04])
@@ -238,8 +262,8 @@ class ArmVisualizer:
         self.fig.canvas.draw_idle()
 
         # send to robot
-        angles = self.joint_angles
-        vis.set_joint_angles(angles)
+        angles6 = list(self.joint_angles) + [self.gripper_angle]
+        vis.set_joint_angles(angles6)
 
     def on_slider_change(self, joint_idx, value):
         """Handle slider change event."""
@@ -375,6 +399,41 @@ class ArmVisualizer:
         self.fig.canvas.draw_idle()
         print(
             f"Workspace visualization: {'ON' if self.show_workspace else 'OFF'}")
+
+    # --- Control button callbacks ---
+    def move_to_pos1(self, event=None):
+        """Call visarm's POS_1 movement."""
+        try:
+            vis.set_survey()
+        except Exception as e:
+            print(f'POS_1 command failed: {e}')
+
+    def move_to_pos2(self, event=None):
+        """Call visarm's POS_2 movement."""
+        try:
+            vis.set_pos_2()
+        except Exception as e:
+            print(f'POS_2 command failed: {e}')
+
+    def open_gripper(self, event=None):
+        """Open the gripper via visarm."""
+        try:
+            vis.open_gripper()
+            # Mirror local state to avoid querying on every frame
+            if hasattr(v, 'GRIPPER_OPEN'):
+                self.gripper_angle = float(v.GRIPPER_OPEN)
+        except Exception as e:
+            print(f'Open gripper failed: {e}')
+
+    def close_gripper(self, event=None):
+        """Close the gripper via visarm."""
+        try:
+            vis.close_gripper()
+            # Mirror local state to avoid querying on every frame
+            if hasattr(v, 'GRIPPER_CLOSE'):
+                self.gripper_angle = float(v.GRIPPER_CLOSE)
+        except Exception as e:
+            print(f'Close gripper failed: {e}')
 
     def run(self):
         """Start the interactive visualization."""

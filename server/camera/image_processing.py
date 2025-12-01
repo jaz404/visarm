@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from .camera import Camera
+from camera import Camera
 
 
 class ImageProcessing:
@@ -55,7 +55,6 @@ class ImageProcessing:
 
     def extract_color_centers(self, frame, hsv_range):
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-
         mask = cv2.inRange(hsv, hsv_range["lower"], hsv_range["upper"])
 
         # Clean mask
@@ -69,7 +68,7 @@ class ImageProcessing:
 
         if len(contours) == 0:
             return [], mask
-        
+
         if contours:
             cnt = max(contours, key=cv2.contourArea)
             (cx, cy), r = cv2.minEnclosingCircle(cnt)
@@ -98,6 +97,45 @@ class ImageProcessing:
             cx, cy = int(cx), int(cy)
             centers.append((cx, cy))
 
+        # Apply linear y-direction correction relative to checkerboard outline
+        # Empirical error (in cm) increases linearly from top to bottom:
+        # Top -> 0cm error, Bottom -> 1.8cm error.
+        # Convert cm to pixels using the checkerboard's known physical width (138mm).
+        if len(centers) > 0 and hasattr(self, "outline") and self.outline is not None and self.outline.size >= 2:
+            # Normalize outline shape and order: BL, BR, TR, TL
+            outline = np.array(self.outline, dtype=np.int32)
+            # Accept shapes (4,2) or (4,1,2); reshape to (4,2)
+            if outline.ndim == 3:
+                outline = outline.reshape(4, 2)
+            # Indices: 0=BL, 1=BR, 2=TR, 3=TL
+            BL = outline[0]
+            BR = outline[1]
+            TR = outline[2]
+            TL = outline[3]
+
+            # Vertical bounds from defined corners
+            y_top = int(min(TR[1], TL[1]))
+            y_bottom = int(max(BL[1], BR[1]))
+            H_px = max(1, abs(y_bottom - y_top))  # avoid div by zero
+
+            # Physical scaling from bottom edge width: BR.x - BL.x corresponds to 138mm => 13.8cm
+            W_px = max(1, int(BR[0]) - int(BL[0]))
+            board_width_cm = 13.8  # 138mm
+            cm_per_px = board_width_cm / float(W_px)
+            px_per_cm = 1.0 / cm_per_px
+            max_err_cm = 1.0  # maximum empirical error at the bottom
+            corrected_centers = []
+            for (cx, cy) in centers:
+                y_norm = abs(cy - y_top) / float(H_px)
+                y_norm = float(np.clip(y_norm, 0.0, 1.0))
+                err_cm = max_err_cm * y_norm
+                err_px = err_cm * px_per_cm
+                corr_px_int = int(round(err_px))
+                if y_norm > 0.0 and err_px > 0.0 and corr_px_int == 0:
+                    corr_px_int = 1
+                cy_corr = int(cy - corr_px_int)
+                corrected_centers.append((cx, cy_corr))
+            centers = corrected_centers
         return centers, mask
 
 
@@ -105,15 +143,15 @@ def main():
     cam = Camera("camera_params.json")
     ip = ImageProcessing(cam.K, cam.dist, cam.outline)
 
-    HSV_DARK_GREEN = {
-        "lower": np.array([30, 71, 0]),
-        "upper": np.array([54, 255, 110])
+    HSV_BLUE = {
+        "lower": np.array([83, 184, 0]),
+        "upper": np.array([179, 255, 108])
     }
-
+    print(cam.outline)
     while True:
         raw = cam.get_frame_raw()
 
-        processed, centers, color_mask = ip.process(raw, HSV_DARK_GREEN)
+        processed, centers, color_mask = ip.process(raw, HSV_BLUE)
 
         # Show visual result
         cv2.imshow("Processed", processed)
