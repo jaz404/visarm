@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from camera import Camera
+from .camera import Camera
 
 
 class ImageProcessing:

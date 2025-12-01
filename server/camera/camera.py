@@ -4,7 +4,7 @@ import json
 import cv2
 import os
 
-from camera_model import compute_camera_pose, pixel_to_robot
+from .camera_model import compute_camera_pose, pixel_to_robot
 
 
 class Camera:
