@@ -229,6 +229,24 @@ Solve for θ2 and θ3 using equations 10, 11, and 12.
 
 This starts with an approximation, so it is not the best as there are some errors induced.
 
+## Documentation
+
+https://learn.adafruit.com/16-channel-pwm-servo-driver?view=all  
+Servo driver library:  
+https://github.com/NachtRaveVL/PCA9685-Arduino  
+>Note: The servo.read() function does not provide feedback on the actual, current physical position of the servo motor shaft. Standard hobby servos are "open-loop" systems from the Arduino's perspective; the Arduino only sends a command signal and does not receive the actual position back from the servo's internal potentiometer.
+
+## Joint Bounds
+
+| Motor | Joint Name        | Motion 1 (°) | Motion 2 (°) |
+| ----- | ----------------- | ------------ | ------------ |
+| 1     | Base (ch 0)       | +90          | -80          |
+| 2     | Shoulder (ch 1)   | +30          | -80          |
+| 3     | Elbow (ch 2)      | +90          | -90          |
+| 4     | Wrist Roll (ch 3) | +90          | -90          |
+| 5     | Wrist Yaw (ch 4)  | +90          | -90          |
+| 6     | Gripper (ch 5)    | +65 (open)   | +90 (close)  |
+
 ## References
 
 - https://www.youtube.com/watch?v=wDus2EKLg3s
