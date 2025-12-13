@@ -7,7 +7,7 @@
 ## Abstract
 This project was aimed to create a 4DOF vision based pick-and-place system to color sort objects, enabling autonomous object localization, grasping, and placement. The process starts with correcting lens distortion to obtain a geometrically accurate view of the scene. A checkerboard workspace is then detected and used as a reference plane for mapping imagespace object locations into robot coordinates. Once objects within the workspace are detected, their positions are transformed into the robot frame solved using inverse kinematics. Inverse kinematics generates multiple solutions, which are evaluated through forward kinematics to identify a reachable solution. The robot executes the selected trajectory to grasp the object, followed by a verification step that confirms whether the pickup was successful. Successful grasps are subsequently placed into predefined bin locations. The system combines calibrated geometric vision with closed-loop grasp verification to ensure robust and consistent manipulation in a structured environment.
 
-### Project Resources: [Project Report](VISARM.pdf); [Demo Video](https://youtu.be/dQCW4TNUgEI)
+### Project Resources: [Project Report](assets/VISARM.pdf); [Demo Video](https://youtu.be/dQCW4TNUgEI)
 
 ### More information in [notes.md](notes.md)
 <!-- ## Joint Bounds
